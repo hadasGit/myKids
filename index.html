@@ -95,11 +95,52 @@ db.ref("kids").on("value", snapshot => {
 function renderKids(kids) {
   kidsContainer.innerHTML = "";
   if (!kids) return;
+
+  const selectedDate = dateFilter.value || todayStr();
+
   Object.keys(kids).forEach(id => {
     const kid = kids[id];
     const box = document.createElement("div");
     box.className = "kid-box";
-    box.textContent = kid.name;
+
+    // שם הילד
+    const nameEl = document.createElement("div");
+    nameEl.textContent = kid.name;
+    nameEl.style.fontWeight = "bold";
+    nameEl.style.marginBottom = "6px";
+    box.appendChild(nameEl);
+
+    // פעילויות של היום
+    const activities = kid.activities || [];
+    const todaysActivities = activities.filter(a => 
+      a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === new Date(selectedDate).getDay())
+    );
+
+    const actList = document.createElement("div");
+    actList.style.marginTop = "6px";
+    actList.style.fontSize = "0.9rem";
+
+    if (todaysActivities.length === 0) {
+      actList.textContent = "אין פעילויות היום";
+      actList.style.color = "#555";
+    } else {
+      todaysActivities.forEach(a => {
+        const aEl = document.createElement("div");
+        aEl.textContent = `${a.time || "--:--"} - ${a.title}`;
+        aEl.style.display = "flex";
+        aEl.style.justifyContent = "space-between";
+
+        // אם הפעילות חוזרת שבועית
+        if (a.repeatWeekly) {
+          aEl.style.color = "#007BFF"; // כחול
+          aEl.style.fontWeight = "bold";
+        }
+
+        actList.appendChild(aEl);
+      });
+    }
+
+    box.appendChild(actList);
 
     // כפתור מחיקה של ילד
     const delBtn = document.createElement("span");
@@ -113,10 +154,19 @@ function renderKids(kids) {
     };
     box.appendChild(delBtn);
 
+    // פתיחת Modal
     box.onclick = () => openKidModal(id, kid);
+
     kidsContainer.appendChild(box);
   });
 }
+
+// פונקציה לקבלת תאריך היום בפורמט yyyy-mm-dd
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
 
 // ====== Modal פעילות ======
 function openKidModal(kidId, kid) {
