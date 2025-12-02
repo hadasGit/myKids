@@ -92,6 +92,101 @@ db.ref("kids").on("value", snapshot => {
   renderKids(snapshot.val());
 });
 
+
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>הילדים שלי</title>
+
+<style>
+body { font-family: Arial, sans-serif; background: #f3f3f3; margin: 0; padding: 20px; }
+h1 { text-align: center; }
+#kids-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 15px; margin-top: 20px; }
+.kid-box { background: white; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0px 2px 5px rgba(0,0,0,0.1); font-size: 18px; cursor: pointer; position: relative; }
+.delete-kid { position: absolute; top: 5px; right: 5px; cursor: pointer; color: red; font-weight: bold; }
+#addKidBtn { display: block; width: 100%; padding: 15px; margin-top: 20px; font-size: 18px; border: none; background: #4CAF50; color: white; border-radius: 8px; cursor: pointer; }
+#dateFilter { display: block; margin: 15px auto; padding: 6px; font-size: 16px; }
+
+/* Modal */
+#modalBackdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); align-items: center; justify-content: center; z-index: 999; }
+#modal { background: white; border-radius: 12px; max-width: 400px; width: 90%; max-height: 80vh; overflow-y: auto; padding: 20px; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.close-btn { border: none; background: transparent; font-size: 1.3rem; cursor: pointer; }
+.activity-list { margin-top: 10px; }
+.activity-item { border-bottom: 1px solid #eee; padding: 6px 0; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; }
+.activity-item button { background: red; color: white; border: none; border-radius: 4px; padding: 2px 6px; cursor: pointer; }
+.add-activity-form { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.add-activity-form input, .add-activity-form label { padding: 6px; font-size: 0.9rem; border-radius: 6px; border: 1px solid #ccc; }
+.add-activity-form button { padding: 8px; border-radius: 6px; border: 1px solid #ccc; background: #f5f5f5; cursor: pointer; }
+.add-activity-form button:hover { background: #e0e0e0; }
+</style>
+</head>
+<body>
+
+<h1>הילדים שלי</h1>
+<input type="date" id="dateFilter">
+<button id="addKidBtn">הוסף ילד</button>
+<div id="kids-container"></div>
+
+<!-- Modal -->
+<div id="modalBackdrop">
+  <div id="modal">
+    <div class="modal-header">
+      <div id="modalTitle"></div>
+      <button class="close-btn" id="closeModal">&times;</button>
+    </div>
+    <div id="modalContent"></div>
+  </div>
+</div>
+
+<!-- Firebase CDN scripts -->
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyD9IzSor82cM39XgdLbywBdq-bM8m2c_ak",
+  authDomain: "mykids-3f832.firebaseapp.com",
+  projectId: "mykids-3f832",
+  storageBucket: "mykids-3f832.firebasestorage.app",
+  messagingSenderId: "869870400492",
+  appId: "1:869870400492:web:80200b8102afb53e1c06c9",
+  measurementId: "G-Q3X18J3SJ4",
+  databaseURL:  "https://mykids-3f832-default-rtdb.firebaseio.com"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+const kidsContainer = document.getElementById("kids-container");
+const addKidBtn = document.getElementById("addKidBtn");
+const modalBackdrop = document.getElementById("modalBackdrop");
+const modalTitle = document.getElementById("modalTitle");
+const modalContent = document.getElementById("modalContent");
+const closeModal = document.getElementById("closeModal");
+const dateFilter = document.getElementById("dateFilter");
+
+let currentKidId = null;
+
+// ====== עזרה עם תאריך היום ======
+function todayStr() {
+  return new Date().toISOString().slice(0,10);
+}
+dateFilter.value = todayStr();
+
+// ====== הוספת ילד ======
+addKidBtn.addEventListener("click", () => {
+  const name = prompt("שם הילד:");
+  if (!name) return;
+  db.ref("kids").push({ name, activities: [] });
+});
+
+// ====== טעינת ילדים ======
+db.ref("kids").on("value", snapshot => {
+  renderKids(snapshot.val());
+});
+
 function renderKids(kids) {
   kidsContainer.innerHTML = "";
   if (!kids) return;
