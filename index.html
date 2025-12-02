@@ -2,18 +2,554 @@
 <html lang="he" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>דשבורד ילדים</title>
-  <link rel="manifest" href="manifest.json">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="apple-touch-icon" href="icon-192.png">
+  <title>דשבורד פעילויות ילדים</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+      margin: 0;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .layout-top {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+
+    .filter-bar, .add-child {
+      background: white;
+      padding: 10px 14px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .filter-bar label,
+    .add-child label {
+      font-size: 0.9rem;
+    }
+
+    .filter-bar input[type="date"],
+    .add-child input[type="text"] {
+      padding: 4px 8px;
+      font-size: 0.9rem;
+    }
+
+    .filter-bar button,
+    .add-child button {
+      padding: 6px 10px;
+      font-size: 0.9rem;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      background: white;
+      cursor: pointer;
+    }
+
+    .filter-bar button:hover,
+    .add-child button:hover {
+      background: #eee;
+    }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 16px;
+    }
+
+    .child-card {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .child-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    }
+
+    .child-name {
+      font-size: 1.2rem;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    .today-count {
+      font-size: 0.9rem;
+      color: #555;
+      margin-bottom: 8px;
+    }
+
+    .today-activities {
+      font-size: 0.85rem;
+      color: #333;
+      max-height: 80px;
+      overflow-y: auto;
+    }
+
+    .today-activities div {
+      margin-bottom: 4px;
+    }
+
+    /* מודל */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+    }
+
+    .modal {
+      background: white;
+      border-radius: 12px;
+      max-width: 550px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      padding: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .modal-title {
+      font-size: 1.2rem;
+      font-weight: bold;
+    }
+
+    .close-btn {
+      border: none;
+      background: transparent;
+      font-size: 1.3rem;
+      cursor: pointer;
+    }
+
+    .modal-section-title {
+      font-size: 1rem;
+      font-weight: bold;
+      margin-top: 10px;
+      margin-bottom: 4px;
+    }
+
+    .activity-list {
+      margin-top: 8px;
+    }
+
+    .activity-item {
+      border-bottom: 1px solid #eee;
+      padding: 8px 0;
+    }
+
+    .activity-item:last-child {
+      border-bottom: none;
+    }
+
+    .activity-title {
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+
+    .activity-meta {
+      font-size: 0.8rem;
+      color: #666;
+      margin-bottom: 4px;
+    }
+
+    .activity-details {
+      font-size: 0.9rem;
+    }
+
+    .add-activity-form {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      font-size: 0.9rem;
+    }
+
+    .add-activity-form label {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .add-activity-form input,
+    .add-activity-form textarea {
+      font-size: 0.9rem;
+      padding: 4px 6px;
+    }
+
+    .add-activity-form textarea {
+      resize: vertical;
+      min-height: 60px;
+      grid-column: 1 / -1;
+    }
+
+    .add-activity-form button {
+      grid-column: 1 / -1;
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      background: #f5f5f5;
+      cursor: pointer;
+    }
+
+    .add-activity-form button:hover {
+      background: #e0e0e0;
+    }
+
+    .empty-state {
+      text-align: center;
+      color: #777;
+      margin-top: 40px;
+      font-size: 0.95rem;
+    }
+
+    @media (max-width: 600px) {
+      .add-activity-form {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
 <body>
-<h2>הילדים שלי</h2>
-<div>הדשבורד מוכן!</div>
-<script>
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
-</script>
+  <h1>דשבורד פעילויות ילדים</h1>
+
+  <div class="layout-top">
+    <div class="filter-bar">
+      <label>
+        תאריך להצגה:
+        <input type="date" id="dateFilter" />
+      </label>
+      <button id="todayBtn">היום</button>
+    </div>
+
+    <form class="add-child" id="addChildForm">
+      <label>
+        שם ילד חדש:
+        <input type="text" id="childNameInput" placeholder="לדוגמה: נועה" required />
+      </label>
+      <button type="submit">הוסף ילד</button>
+    </form>
+  </div>
+
+  <div class="dashboard" id="dashboard"></div>
+  <div class="empty-state" id="emptyState" style="display:none;">
+    עדיין אין ילדים בדשבורד. הוסיפו ילד חדש כדי להתחיל ✨
+  </div>
+
+  <!-- מודל לפרטי ילד -->
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title" id="modalTitle"></div>
+        <button class="close-btn" id="closeModal">&times;</button>
+      </div>
+      <div id="modalContent"></div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = "kidsDashboard_v1";
+    let childrenData = [];
+    let currentChildId = null;
+
+    function loadData() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          childrenData = JSON.parse(saved);
+        } catch (e) {
+          childrenData = [];
+        }
+      } else {
+        // נתוני דוגמה להתחלה
+        childrenData = [
+          {
+            id: "c1",
+            name: "אורי",
+            activities: [
+              { id: "a1", date: "2025-12-01", time: "15:15", title: "שיעור פרטי", details: "הכנה למבחן בשפה" }
+            ]
+          }
+        ];
+        saveData();
+      }
+    }
+
+    function saveData() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(childrenData));
+    }
+
+    function getTodayDateStr() {
+      const d = new Date();
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    }
+
+    function renderDashboard() {
+      const dashboard = document.getElementById("dashboard");
+      const emptyState = document.getElementById("emptyState");
+      const dateFilter = document.getElementById("dateFilter");
+      const selectedDate = dateFilter.value || getTodayDateStr();
+
+      dashboard.innerHTML = "";
+
+      if (!childrenData.length) {
+        emptyState.style.display = "block";
+        return;
+      } else {
+        emptyState.style.display = "none";
+      }
+
+      childrenData.forEach(child => {
+        const todayActivities = child.activities.filter(a => a.date === selectedDate);
+
+        const card = document.createElement("div");
+        card.className = "child-card";
+        card.dataset.id = child.id;
+
+        const nameEl = document.createElement("div");
+        nameEl.className = "child-name";
+        nameEl.textContent = child.name;
+
+        const countEl = document.createElement("div");
+        countEl.className = "today-count";
+        countEl.textContent = todayActivities.length
+          ? `${todayActivities.length} פעילויות בתאריך זה`
+          : `אין פעילויות בתאריך זה`;
+
+        const listEl = document.createElement("div");
+        listEl.className = "today-activities";
+
+        todayActivities.forEach(a => {
+          const row = document.createElement("div");
+          row.textContent = `${a.time || ""} ${a.title}`;
+          listEl.appendChild(row);
+        });
+
+        card.appendChild(nameEl);
+        card.appendChild(countEl);
+        card.appendChild(listEl);
+
+        card.addEventListener("click", () => openChildModal(child.id));
+
+        dashboard.appendChild(card);
+      });
+    }
+
+    function openChildModal(childId) {
+      currentChildId = childId;
+      const child = childrenData.find(c => c.id === childId);
+      if (!child) return;
+
+      const backdrop = document.getElementById("modalBackdrop");
+      const titleEl = document.getElementById("modalTitle");
+      const contentEl = document.getElementById("modalContent");
+
+      titleEl.textContent = `פעילויות של ${child.name}`;
+      contentEl.innerHTML = "";
+
+      // רשימת פעילויות
+      const activitiesTitle = document.createElement("div");
+      activitiesTitle.className = "modal-section-title";
+      activitiesTitle.textContent = "כל הפעילויות:";
+
+      const listContainer = document.createElement("div");
+      listContainer.className = "activity-list";
+
+      const sortedActivities = [...child.activities].sort((a, b) => {
+        const keyA = `${a.date} ${a.time || ""}`;
+        const keyB = `${b.date} ${b.time || ""}`;
+        return keyA.localeCompare(keyB);
+      });
+
+      if (sortedActivities.length === 0) {
+        const noAct = document.createElement("div");
+        noAct.textContent = "אין עדיין פעילויות.";
+        listContainer.appendChild(noAct);
+      } else {
+        sortedActivities.forEach(a => {
+          const item = document.createElement("div");
+          item.className = "activity-item";
+
+          const title = document.createElement("div");
+          title.className = "activity-title";
+          title.textContent = a.title;
+
+          const meta = document.createElement("div");
+          meta.className = "activity-meta";
+          meta.textContent = `${a.date} ${a.time || ""}`;
+
+          const details = document.createElement("div");
+          details.className = "activity-details";
+          details.textContent = a.details || "";
+
+          item.appendChild(title);
+          item.appendChild(meta);
+          item.appendChild(details);
+          listContainer.appendChild(item);
+        });
+      }
+
+      // טופס להוספת פעילות
+      const formTitle = document.createElement("div");
+      formTitle.className = "modal-section-title";
+      formTitle.textContent = "הוספת פעילות חדשה:";
+
+      const form = document.createElement("form");
+      form.className = "add-activity-form";
+
+      const dateLabel = document.createElement("label");
+      dateLabel.textContent = "תאריך:";
+      const dateInput = document.createElement("input");
+      dateInput.type = "date";
+      dateInput.required = true;
+      dateInput.value = document.getElementById("dateFilter").value || getTodayDateStr();
+      dateLabel.appendChild(dateInput);
+
+      const timeLabel = document.createElement("label");
+      timeLabel.textContent = "שעה:";
+      const timeInput = document.createElement("input");
+      timeInput.type = "time";
+      timeLabel.appendChild(timeInput);
+
+      const titleLabel = document.createElement("label");
+      titleLabel.textContent = "כותרת:";
+      const titleInput = document.createElement("input");
+      titleInput.type = "text";
+      titleInput.required = true;
+      titleInput.placeholder = "לדוגמה: חוג כדורגל";
+      titleLabel.appendChild(titleInput);
+
+      const detailsLabel = document.createElement("label");
+      detailsLabel.textContent = "פרטים:";
+      const detailsInput = document.createElement("textarea");
+      detailsInput.placeholder = "לדוגמה: אימון במגרש ליד הבית...";
+      detailsLabel.appendChild(detailsInput);
+
+      const addBtn = document.createElement("button");
+      addBtn.type = "submit";
+      addBtn.textContent = "שמור פעילות";
+
+      form.appendChild(dateLabel);
+      form.appendChild(timeLabel);
+      form.appendChild(titleLabel);
+      form.appendChild(detailsLabel);
+      form.appendChild(addBtn);
+
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        addActivityToChild(childId, {
+          date: dateInput.value,
+          time: timeInput.value,
+          title: titleInput.value.trim(),
+          details: detailsInput.value.trim()
+        });
+        openChildModal(childId); // לרענן את התצוגה במודל
+      });
+
+      contentEl.appendChild(activitiesTitle);
+      contentEl.appendChild(listContainer);
+      contentEl.appendChild(formTitle);
+      contentEl.appendChild(form);
+
+      backdrop.style.display = "flex";
+    }
+
+    function closeChildModal() {
+      const backdrop = document.getElementById("modalBackdrop");
+      backdrop.style.display = "none";
+      currentChildId = null;
+    }
+
+    function addActivityToChild(childId, activity) {
+      const child = childrenData.find(c => c.id === childId);
+      if (!child) return;
+
+      const newActivity = {
+        id: "a_" + Date.now(),
+        date: activity.date,
+        time: activity.time || "",
+        title: activity.title || "",
+        details: activity.details || ""
+      };
+      child.activities.push(newActivity);
+      saveData();
+      renderDashboard();
+    }
+
+    function setupEvents() {
+      const dateFilter = document.getElementById("dateFilter");
+      const todayBtn = document.getElementById("todayBtn");
+      const closeModalBtn = document.getElementById("closeModal");
+      const backdrop = document.getElementById("modalBackdrop");
+      const addChildForm = document.getElementById("addChildForm");
+      const childNameInput = document.getElementById("childNameInput");
+
+      dateFilter.value = getTodayDateStr();
+
+      dateFilter.addEventListener("change", () => {
+        renderDashboard();
+      });
+
+      todayBtn.addEventListener("click", () => {
+        dateFilter.value = getTodayDateStr();
+        renderDashboard();
+      });
+
+      closeModalBtn.addEventListener("click", closeChildModal);
+
+      backdrop.addEventListener("click", (e) => {
+        if (e.target === backdrop) {
+          closeChildModal();
+        }
+      });
+
+      addChildForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const name = childNameInput.value.trim();
+        if (!name) return;
+        const newChild = {
+          id: "c_" + Date.now(),
+          name,
+          activities: []
+        };
+        childrenData.push(newChild);
+        saveData();
+        childNameInput.value = "";
+        renderDashboard();
+      });
+    }
+
+    // אתחול
+    loadData();
+    setupEvents();
+    renderDashboard();
+  </script>
 </body>
 </html>
