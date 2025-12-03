@@ -87,11 +87,8 @@ function getTodayDateStr() {
   return `${year}-${month}-${day}`;
 }
 
-//function todayStr() {
-//  return new Date().toISOString().slice(0,10);
-//}
 function todayStr() {
-  return new Date().toISOString().split("T")[0];
+  return new Date().toISOString().slice(0,10);
 }
 dateFilter.value = todayStr();
 
@@ -107,13 +104,11 @@ db.ref("kids").on("value", snapshot => {
   renderKids(snapshot.val());
 });
 
-function renderKids(kids, selectedDate = null) {
+function renderKids(kids) {
   kidsContainer.innerHTML = "";
   if (!kids) return;
- // אם לא נבחר תאריך – משתמשים בתאריך של היום
-  const filterDate = selectedDate || dateFilter.value || getTodayStr();
 
-  const selectedDate = getSelectedDate();
+  const selectedDate = dateFilter.value || todayStr();
 
   Object.keys(kids).forEach(id => {
     const kid = kids[id];
@@ -130,7 +125,7 @@ function renderKids(kids, selectedDate = null) {
     // פעילויות של היום
     const activities = kid.activities || [];
     const todaysActivities = activities.filter(a => 
-      a.date === filterDate//selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === new Date(selectedDate).getDay())
+      a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === new Date(selectedDate).getDay())
     );
 
     const actList = document.createElement("div");
@@ -192,8 +187,6 @@ function openKidModal(kidId, kid) {
   modalContent.innerHTML = "";
 
   const selectedDate = dateFilter.value || todayStr();
-  const activities = kid.activities || [];
-  const filtered = dateFilter.value ? activities.filter(a => a.date === dateFilter.value) : activities;
 
   // רשימת פעילויות
   const list = document.createElement("div");
@@ -278,13 +271,12 @@ modalBackdrop.onclick = e => { if (e.target === modalBackdrop) closeModal.onclic
 
 // ====== עדכון רשימת פעילויות אוטומטית כשמשנים את התאריך ======
 dateFilter.addEventListener("change", () => {
-  db.ref("kids").once("value").then(snapshot => {
-    const kids = snapshot.val();
-  //  renderKids(kids);   // <-- מרענן את הקוביות לפי התאריך שנבחר
-    renderKids(kids, dateFilter.value); // שולח תאריך נבחר לפונקציה
-  });
-  });
-
+  if (currentKidId) {
+    db.ref("kids/" + currentKidId).once("value").then(snap => {
+      openKidModal(currentKidId, snap.val());
+    });
+  }
+});
 </script>
 
 </body>
