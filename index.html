@@ -31,20 +31,25 @@ h1 { text-align: center; }
 <body>
 
 <h1>הילדים שלי</h1>
-<input type="date" id="dateFilter">
-<button id="refreshBtn">רענון</button>
-<style>
-#refreshBtn {
-    padding: 8px 14px;
-    font-size: 16px;
-    border: none;
-    background: #2196F3;
-    color: white;
-    border-radius: 6px;
-    cursor: pointer;
-    margin-right: 10px;
-}
-</style>
+
+<div style="display:flex; align-items:center; gap:8px; justify-content:center;">
+    <input type="date" id="dateFilter">
+
+    <!-- כפתור רענון עם אייקון -->
+    <button id="refreshBtn" style="
+        background:#e0e0e0;
+        border:none;
+        padding:6px 8px;
+        border-radius:6px;
+        cursor:pointer;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+    ">
+        🔄
+    </button>
+</div>
+
 
 <button id="addKidBtn">הוסף ילד</button>
 <div id="kids-container"></div>
