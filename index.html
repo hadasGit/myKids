@@ -87,8 +87,11 @@ function getTodayDateStr() {
   return `${year}-${month}-${day}`;
 }
 
+//function todayStr() {
+//  return new Date().toISOString().slice(0,10);
+//}
 function todayStr() {
-  return new Date().toISOString().slice(0,10);
+  return new Date().toISOString().split("T")[0];
 }
 dateFilter.value = todayStr();
 
@@ -104,9 +107,11 @@ db.ref("kids").on("value", snapshot => {
   renderKids(snapshot.val());
 });
 
-function renderKids(kids) {
+function renderKids(kids, selectedDate = null) {
   kidsContainer.innerHTML = "";
   if (!kids) return;
+ // אם לא נבחר תאריך – משתמשים בתאריך של היום
+  const filterDate = selectedDate || dateFilter.value || getTodayStr();
 
   const selectedDate = getSelectedDate();
 
@@ -125,7 +130,7 @@ function renderKids(kids) {
     // פעילויות של היום
     const activities = kid.activities || [];
     const todaysActivities = activities.filter(a => 
-      a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === new Date(selectedDate).getDay())
+      a.date === filterDate//selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === new Date(selectedDate).getDay())
     );
 
     const actList = document.createElement("div");
@@ -274,10 +279,11 @@ modalBackdrop.onclick = e => { if (e.target === modalBackdrop) closeModal.onclic
 // ====== עדכון רשימת פעילויות אוטומטית כשמשנים את התאריך ======
 dateFilter.addEventListener("change", () => {
   db.ref("kids").once("value").then(snapshot => {
-    renderKids(snapshot.val());
+    const kids = snapshot.val();
+  //  renderKids(kids);   // <-- מרענן את הקוביות לפי התאריך שנבחר
+    renderKids(kids, dateFilter.value); // שולח תאריך נבחר לפונקציה
   });
-});
-
+  });
 
 </script>
 
