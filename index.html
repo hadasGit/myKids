@@ -32,6 +32,20 @@ h1 { text-align: center; }
 
 <h1>הילדים שלי</h1>
 <input type="date" id="dateFilter">
+<button id="refreshBtn">רענון</button>
+<style>
+#refreshBtn {
+    padding: 8px 14px;
+    font-size: 16px;
+    border: none;
+    background: #2196F3;
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-right: 10px;
+}
+</style>
+
 <button id="addKidBtn">הוסף ילד</button>
 <div id="kids-container"></div>
 
@@ -91,6 +105,13 @@ function todayStr() {
   return new Date().toISOString().slice(0,10);
 }
 dateFilter.value = todayStr();
+
+document.getElementById("refreshBtn").addEventListener("click", () => {
+    db.ref("kids").once("value").then(snapshot => {
+        const kids = snapshot.val();
+        renderKids(kids, dateFilter.value || null);
+    });
+});
 
 // ====== הוספת ילד ======
 addKidBtn.addEventListener("click", () => {
