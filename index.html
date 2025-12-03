@@ -8,93 +8,24 @@
 <style>
 body { font-family: Arial, sans-serif; background: #f3f3f3; margin: 0; padding: 20px; }
 h1 { text-align: center; }
+#kids-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 15px; margin-top: 20px; }
+.kid-box { background: white; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0px 2px 5px rgba(0,0,0,0.1); font-size: 18px; cursor: pointer; position: relative; }
+.delete-kid { position: absolute; top: 5px; right: 5px; cursor: pointer; color: red; font-weight: bold; }
+#addKidBtn { display: block; width: 100%; padding: 15px; margin-top: 20px; font-size: 18px; border: none; background: #4CAF50; color: white; border-radius: 8px; cursor: pointer; }
 #dateFilter { display: block; margin: 15px auto; padding: 6px; font-size: 16px; }
 
-#kids-container {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 15px;
-  margin-top: 20px;
-}
-
-.kid-box {
-  background: white;
-  padding: 20px;
-  border-radius: 12px;
-  text-align: center;
-  box-shadow: 0px 2px 5px rgba(0,0,0,0.1);
-  font-size: 18px;
-  cursor: pointer;
-  position: relative;
-}
-
-.kid-box .delete-kid {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  cursor: pointer;
-  color: red;
-  font-weight: bold;
-}
-
-.kid-box .today-activities {
-  margin-top: 8px;
-  font-size: 0.85rem;
-  color: #555;
-}
-
-#addKidBtn {
-  display: block;
-  width: 100%;
-  padding: 15px;
-  margin-top: 20px;
-  font-size: 18px;
-  border: none;
-  background: #4CAF50;
-  color: white;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
 /* Modal */
-#modalBackdrop {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.4);
-  align-items: center;
-  justify-content: center;
-  z-index: 999;
-}
-#modal {
-  background: white;
-  border-radius: 12px;
-  max-width: 400px;
-  width: 90%;
-  max-height: 80vh;
-  overflow-y: auto;
-  padding: 20px;
-}
+#modalBackdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); align-items: center; justify-content: center; z-index: 999; }
+#modal { background: white; border-radius: 12px; max-width: 400px; width: 90%; max-height: 80vh; overflow-y: auto; padding: 20px; }
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .close-btn { border: none; background: transparent; font-size: 1.3rem; cursor: pointer; }
-
 .activity-list { margin-top: 10px; }
-.activity-item {
-  border-bottom: 1px solid #eee;
-  padding: 6px 0;
-  font-size: 0.9rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
+.activity-item { border-bottom: 1px solid #eee; padding: 6px 0; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; }
 .activity-item button { background: red; color: white; border: none; border-radius: 4px; padding: 2px 6px; cursor: pointer; }
-
 .add-activity-form { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
-.add-activity-form input { padding: 6px; font-size: 0.9rem; border-radius: 6px; border: 1px solid #ccc; }
-.add-activity-form label { display: flex; align-items: center; gap: 6px; font-size: 0.9rem; }
+.add-activity-form input, .add-activity-form label { padding: 6px; font-size: 0.9rem; border-radius: 6px; border: 1px solid #ccc; }
 .add-activity-form button { padding: 8px; border-radius: 6px; border: 1px solid #ccc; background: #f5f5f5; cursor: pointer; }
 .add-activity-form button:hover { background: #e0e0e0; }
-
 </style>
 </head>
 <body>
@@ -120,9 +51,15 @@ h1 { text-align: center; }
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
 <script>
-// ====== Firebase config ======
 const firebaseConfig = {
-  // כאן את מכניסה את הפרטים שלך
+  apiKey: "AIzaSyD9IzSor82cM39XgdLbywBdq-bM8m2c_ak",
+  authDomain: "mykids-3f832.firebaseapp.com",
+  projectId: "mykids-3f832",
+  storageBucket: "mykids-3f832.firebasestorage.app",
+  messagingSenderId: "869870400492",
+  appId: "1:869870400492:web:80200b8102afb53e1c06c9",
+  measurementId: "G-Q3X18J3SJ4",
+  databaseURL:  "https://mykids-3f832-default-rtdb.firebaseio.com"
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
@@ -137,11 +74,23 @@ const dateFilter = document.getElementById("dateFilter");
 
 let currentKidId = null;
 
-// ====== עזר ======
-function getTodayStr() {
-  const d = new Date();
-  return d.toISOString().split("T")[0];
+// ====== עזרה עם תאריך היום ======
+  function getSelectedDate() {
+  return dateFilter.value || getTodayDateStr();
 }
+
+function getTodayDateStr() {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth()+1).padStart(2,"0");
+  const day = String(d.getDate()).padStart(2,"0");
+  return `${year}-${month}-${day}`;
+}
+
+function todayStr() {
+  return new Date().toISOString().slice(0,10);
+}
+dateFilter.value = todayStr();
 
 // ====== הוספת ילד ======
 addKidBtn.addEventListener("click", () => {
@@ -155,29 +104,152 @@ db.ref("kids").on("value", snapshot => {
   renderKids(snapshot.val());
 });
 
-// ====== render קוביות ילדים ======
-function renderKids(kidsData) {
+
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>הילדים שלי</title>
+
+<style>
+body { font-family: Arial, sans-serif; background: #f3f3f3; margin: 0; padding: 20px; }
+h1 { text-align: center; }
+#kids-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 15px; margin-top: 20px; }
+.kid-box { background: white; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0px 2px 5px rgba(0,0,0,0.1); font-size: 18px; cursor: pointer; position: relative; }
+.delete-kid { position: absolute; top: 5px; right: 5px; cursor: pointer; color: red; font-weight: bold; }
+#addKidBtn { display: block; width: 100%; padding: 15px; margin-top: 20px; font-size: 18px; border: none; background: #4CAF50; color: white; border-radius: 8px; cursor: pointer; }
+#dateFilter { display: block; margin: 15px auto; padding: 6px; font-size: 16px; }
+
+/* Modal */
+#modalBackdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); align-items: center; justify-content: center; z-index: 999; }
+#modal { background: white; border-radius: 12px; max-width: 400px; width: 90%; max-height: 80vh; overflow-y: auto; padding: 20px; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.close-btn { border: none; background: transparent; font-size: 1.3rem; cursor: pointer; }
+.activity-list { margin-top: 10px; }
+.activity-item { border-bottom: 1px solid #eee; padding: 6px 0; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; }
+.activity-item button { background: red; color: white; border: none; border-radius: 4px; padding: 2px 6px; cursor: pointer; }
+.add-activity-form { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.add-activity-form input, .add-activity-form label { padding: 6px; font-size: 0.9rem; border-radius: 6px; border: 1px solid #ccc; }
+.add-activity-form button { padding: 8px; border-radius: 6px; border: 1px solid #ccc; background: #f5f5f5; cursor: pointer; }
+.add-activity-form button:hover { background: #e0e0e0; }
+</style>
+</head>
+<body>
+
+<h1>הילדים שלי</h1>
+<input type="date" id="dateFilter">
+<button id="addKidBtn">הוסף ילד</button>
+<div id="kids-container"></div>
+
+<!-- Modal -->
+<div id="modalBackdrop">
+  <div id="modal">
+    <div class="modal-header">
+      <div id="modalTitle"></div>
+      <button class="close-btn" id="closeModal">&times;</button>
+    </div>
+    <div id="modalContent"></div>
+  </div>
+</div>
+
+<!-- Firebase CDN scripts -->
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyD9IzSor82cM39XgdLbywBdq-bM8m2c_ak",
+  authDomain: "mykids-3f832.firebaseapp.com",
+  projectId: "mykids-3f832",
+  storageBucket: "mykids-3f832.firebasestorage.app",
+  messagingSenderId: "869870400492",
+  appId: "1:869870400492:web:80200b8102afb53e1c06c9",
+  measurementId: "G-Q3X18J3SJ4",
+  databaseURL:  "https://mykids-3f832-default-rtdb.firebaseio.com"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+const kidsContainer = document.getElementById("kids-container");
+const addKidBtn = document.getElementById("addKidBtn");
+const modalBackdrop = document.getElementById("modalBackdrop");
+const modalTitle = document.getElementById("modalTitle");
+const modalContent = document.getElementById("modalContent");
+const closeModal = document.getElementById("closeModal");
+const dateFilter = document.getElementById("dateFilter");
+
+let currentKidId = null;
+
+// ====== עזרה עם תאריך היום ======
+function todayStr() {
+  return new Date().toISOString().slice(0,10);
+}
+dateFilter.value = todayStr();
+
+// ====== הוספת ילד ======
+addKidBtn.addEventListener("click", () => {
+  const name = prompt("שם הילד:");
+  if (!name) return;
+  db.ref("kids").push({ name, activities: [] });
+});
+
+// ====== טעינת ילדים ======
+db.ref("kids").on("value", snapshot => {
+  renderKids(snapshot.val());
+});
+
+function renderKids(kids) {
   kidsContainer.innerHTML = "";
-  if (!kidsData) return;
+  if (!kids) return;
 
-  const selectedDate = dateFilter.value || getTodayStr();
+  const selectedDate = dateFilter.value || todayStr();
 
-  Object.keys(kidsData).forEach(id => {
-    const kid = kidsData[id];
+  Object.keys(kids).forEach(id => {
+    const kid = kids[id];
     const box = document.createElement("div");
     box.className = "kid-box";
-    box.textContent = kid.name;
 
-    // תצוגת פעילויות של היום
-    const activitiesToday = (kid.activities || []).filter(a => a.date === selectedDate);
-    const actDiv = document.createElement("div");
-    actDiv.className = "today-activities";
-    actDiv.textContent = activitiesToday.length
-      ? activitiesToday.map(a => a.title).join(", ")
-      : "אין פעילויות היום";
-    box.appendChild(actDiv);
+    // שם הילד
+    const nameEl = document.createElement("div");
+    nameEl.textContent = kid.name;
+    nameEl.style.fontWeight = "bold";
+    nameEl.style.marginBottom = "6px";
+    box.appendChild(nameEl);
 
-    // כפתור מחיקה
+    // פעילויות של היום
+    const activities = kid.activities || [];
+    const todaysActivities = activities.filter(a => 
+      a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === new Date(selectedDate).getDay())
+    );
+
+    const actList = document.createElement("div");
+    actList.style.marginTop = "6px";
+    actList.style.fontSize = "0.9rem";
+
+    if (todaysActivities.length === 0) {
+      actList.textContent = "אין פעילויות היום";
+      actList.style.color = "#555";
+    } else {
+      todaysActivities.forEach(a => {
+        const aEl = document.createElement("div");
+        aEl.textContent = `${a.time || "--:--"} - ${a.title}`;
+        aEl.style.display = "flex";
+        aEl.style.justifyContent = "space-between";
+
+        // אם הפעילות חוזרת שבועית
+        if (a.repeatWeekly) {
+          aEl.style.color = "#007BFF"; // כחול
+          aEl.style.fontWeight = "bold";
+        }
+
+        actList.appendChild(aEl);
+      });
+    }
+
+    box.appendChild(actList);
+
+    // כפתור מחיקה של ילד
     const delBtn = document.createElement("span");
     delBtn.textContent = "×";
     delBtn.className = "delete-kid";
@@ -189,41 +261,44 @@ function renderKids(kidsData) {
     };
     box.appendChild(delBtn);
 
+    // פתיחת Modal
     box.onclick = () => openKidModal(id, kid);
+
     kidsContainer.appendChild(box);
   });
 }
 
-// ====== שינוי תאריך ======
-dateFilter.addEventListener("change", () => {
-  db.ref("kids").once("value").then(snap => renderKids(snap.val()));
-});
+// פונקציה לקבלת תאריך היום בפורמט yyyy-mm-dd
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
 
-// ====== modal פעילויות ======
+
+// ====== Modal פעילות ======
 function openKidModal(kidId, kid) {
   currentKidId = kidId;
   modalTitle.textContent = kid.name;
   modalContent.innerHTML = "";
 
-  const selectedDate = dateFilter.value;
+  const selectedDate = dateFilter.value || todayStr();
 
+  // רשימת פעילויות
   const list = document.createElement("div");
   list.className = "activity-list";
 
   const activities = kid.activities || [];
-  let filteredActivities = selectedDate ? activities.filter(a => a.date === selectedDate) : activities;
+  const filtered = activities.filter(a => 
+    a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === new Date(selectedDate).getDay())
+  );
 
-  if (!filteredActivities.length) {
+  if (!filtered.length) {
     list.textContent = "אין פעילויות בתאריך זה.";
   } else {
-    filteredActivities.forEach(a => {
+    filtered.forEach(a => {
       const item = document.createElement("div");
       item.className = "activity-item";
-      item.textContent = `${a.date} ${a.time || ""} - ${a.title}`;
-
-      const editBtn = document.createElement("button");
-      editBtn.textContent = "עריכה";
-      editBtn.onclick = () => editActivity(kidId, a, kid);
+      item.textContent = `${a.date} ${a.time || ""} - ${a.title}${a.repeatWeekly ? " 🔁" : ""}`;
 
       const delBtn = document.createElement("button");
       delBtn.textContent = "×";
@@ -233,7 +308,6 @@ function openKidModal(kidId, kid) {
         openKidModal(kidId, { ...kid, activities: updated });
       };
 
-      item.appendChild(editBtn);
       item.appendChild(delBtn);
       list.appendChild(item);
     });
@@ -244,20 +318,20 @@ function openKidModal(kidId, kid) {
   form.className = "add-activity-form";
 
   const dateInput = document.createElement("input");
-  dateInput.type = "date"; dateInput.required = true; dateInput.value = selectedDate || getTodayStr();
+  dateInput.type = "date"; dateInput.required = true; dateInput.value = selectedDate;
 
   const timeInput = document.createElement("input");
-  timeInput.type = "time";
+  timeInput.type = "time"; timeInput.placeholder = "שעה";
 
   const titleInput = document.createElement("input");
   titleInput.type = "text"; titleInput.required = true; titleInput.placeholder = "כותרת פעילות";
 
-  const repeatInput = document.createElement("label");
-  const repeatCheckbox = document.createElement("input");
-  repeatCheckbox.type = "checkbox";
-  repeatCheckbox.checked = false;
-  repeatInput.appendChild(repeatCheckbox);
-  repeatInput.appendChild(document.createTextNode("פעילות חוזרת שבועית"));
+  // Checkbox פעילות חוזרת
+  const repeatInput = document.createElement("input");
+  repeatInput.type = "checkbox";
+  const repeatLabel = document.createElement("label");
+  repeatLabel.textContent = "פעילות חוזרת שבועית ";
+  repeatLabel.appendChild(repeatInput);
 
   const addBtn = document.createElement("button");
   addBtn.type = "submit"; addBtn.textContent = "הוסף פעילות";
@@ -265,7 +339,7 @@ function openKidModal(kidId, kid) {
   form.appendChild(dateInput);
   form.appendChild(timeInput);
   form.appendChild(titleInput);
-  form.appendChild(repeatInput);
+  form.appendChild(repeatLabel);
   form.appendChild(addBtn);
 
   form.addEventListener("submit", e => {
@@ -275,11 +349,10 @@ function openKidModal(kidId, kid) {
       date: dateInput.value,
       time: timeInput.value,
       title: titleInput.value,
-      repeatWeekly: repeatCheckbox.checked
+      repeatWeekly: repeatInput.checked
     };
-    const updated = [...activities, newActivity];
-    db.ref("kids/" + kidId + "/activities").set(updated);
-    openKidModal(kidId, { ...kid, activities: updated });
+    db.ref("kids/" + kidId + "/activities").set([...activities, newActivity]);
+    openKidModal(kidId, { ...kid, activities: [...activities, newActivity] });
   });
 
   modalContent.appendChild(list);
@@ -288,18 +361,18 @@ function openKidModal(kidId, kid) {
   modalBackdrop.style.display = "flex";
 }
 
-// ====== עריכת פעילות ======
-function editActivity(kidId, activity, kid) {
-  const newTitle = prompt("ערוך את שם הפעילות:", activity.title);
-  if (!newTitle) return;
-  const updated = kid.activities.map(a => a.id === activity.id ? { ...a, title: newTitle } : a);
-  db.ref("kids/" + kidId + "/activities").set(updated);
-  openKidModal(kidId, { ...kid, activities: updated });
-}
-
 closeModal.onclick = () => { modalBackdrop.style.display = "none"; currentKidId = null; };
 modalBackdrop.onclick = e => { if (e.target === modalBackdrop) closeModal.onclick(); };
 
+// ====== עדכון רשימת פעילויות אוטומטית כשמשנים את התאריך ======
+dateFilter.addEventListener("change", () => {
+  if (currentKidId) {
+    db.ref("kids/" + currentKidId).once("value").then(snap => {
+      openKidModal(currentKidId, snap.val());
+    });
+  }
+});
 </script>
+
 </body>
 </html>
