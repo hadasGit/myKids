@@ -108,7 +108,7 @@ function renderKids(kids) {
   kidsContainer.innerHTML = "";
   if (!kids) return;
 
-  const selectedDate = dateFilter.value || todayStr();
+  const selectedDate = getSelectedDate();
 
   Object.keys(kids).forEach(id => {
     const kid = kids[id];
@@ -187,6 +187,8 @@ function openKidModal(kidId, kid) {
   modalContent.innerHTML = "";
 
   const selectedDate = dateFilter.value || todayStr();
+  const activities = kid.activities || [];
+  const filtered = dateFilter.value ? activities.filter(a => a.date === dateFilter.value) : activities;
 
   // רשימת פעילויות
   const list = document.createElement("div");
@@ -271,12 +273,12 @@ modalBackdrop.onclick = e => { if (e.target === modalBackdrop) closeModal.onclic
 
 // ====== עדכון רשימת פעילויות אוטומטית כשמשנים את התאריך ======
 dateFilter.addEventListener("change", () => {
-  if (currentKidId) {
-    db.ref("kids/" + currentKidId).once("value").then(snap => {
-      openKidModal(currentKidId, snap.val());
-    });
-  }
+  db.ref("kids").once("value").then(snapshot => {
+    renderKids(snapshot.val());
+  });
 });
+
+
 </script>
 
 </body>
