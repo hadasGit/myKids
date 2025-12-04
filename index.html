@@ -186,23 +186,23 @@ function renderKids(kids) {
 
         actList.appendChild(aEl);
       });
-
-          const permanentNotes = activities.filter(a => a.isPermanent);
-    
-          permanentNotes.forEach(note => {
-              const noteDiv = document.createElement("div");
-              noteDiv.className = "permanent-note";
-          
-              // מציג גם תאריך וגם כותרת
-              const formattedDate = note.date ? note.date.split("-").reverse().join("-") : "";
-              noteDiv.textContent = `${formattedDate} — ${note.title}`;
-          
-              box.appendChild(noteDiv);
-          });  
     }
 
     box.appendChild(actList);
 
+    const permanentNotes = activities.filter(a => a.isPermanent);
+  
+        permanentNotes.forEach(note => {
+            const noteDiv = document.createElement("div");
+            noteDiv.className = "permanent-note";
+        
+            // מציג גם תאריך וגם כותרת
+            const formattedDate = note.date ? note.date.split("-").reverse().join("-") : "";
+            noteDiv.textContent = `${formattedDate} — ${note.title}`;
+        
+            box.appendChild(noteDiv);
+        });  
+    
 //    const cleaned = activities.filter(a => {
 //      if (a.isPermanent) return true;   // נשאר תמיד
 //      return a.date >= new Date(selectedDate).getDay();           // תאריכים שעברו נמחקים
