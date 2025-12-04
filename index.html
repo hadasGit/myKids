@@ -12,7 +12,7 @@ h1 { text-align: center; }
 .kid-box { background: white; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0px 2px 5px rgba(0,0,0,0.1); font-size: 18px; cursor: pointer; position: relative; }
 .delete-kid { position: absolute; top: 5px; right: 5px; cursor: pointer; color: red; font-weight: bold; }
 #addKidBtn { display: block; width: 100%; padding: 15px; margin-top: 20px; font-size: 18px; border: none; background: #4CAF50; color: white; border-radius: 8px; cursor: pointer; }
-#dateFilter { display: block; margin: 15px auto; padding: 6px; font-size: 16px; }
+#dateFilter { display: block; margin: 0 !important; padding: 6px; font-size: 16px; }
 
 /* Modal */
 #modalBackdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); align-items: center; justify-content: center; z-index: 999; }
@@ -26,9 +26,6 @@ h1 { text-align: center; }
 .add-activity-form input, .add-activity-form label { padding: 6px; font-size: 0.9rem; border-radius: 6px; border: 1px solid #ccc; }
 .add-activity-form button { padding: 8px; border-radius: 6px; border: 1px solid #ccc; background: #f5f5f5; cursor: pointer; }
 .add-activity-form button:hover { background: #e0e0e0; }
-#dateRow { gap: 0 !important; }
-#dateRow input, #dateRow button { margin: 0 !important; }
-
 </style>
 </head>
 <body>
@@ -153,7 +150,7 @@ function renderKids(kids) {
     // פעילויות של היום
     const activities = kid.activities || [];
     const todaysActivities = activities.filter(a => 
-      a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === new Date(selectedDate).getDay())
+     a.isPermanent || a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === new Date(selectedDate).getDay())
     );
 
     const actList = document.createElement("div");
@@ -182,6 +179,16 @@ function renderKids(kids) {
 
     box.appendChild(actList);
 
+    const cleaned = activities.filter(a => {
+      if (a.isPermanent) return true;   // נשאר תמיד
+      return a.date >= today;           // תאריכים שעברו נמחקים
+    });
+  
+    if (cleaned.length !== activities.length) {
+      db.ref("kids/" + id + "/activities").set(cleaned);
+      kid.activities = cleaned;
+    }
+    
     // כפתור מחיקה של ילד
     const delBtn = document.createElement("span");
     delBtn.textContent = "×";
@@ -245,6 +252,16 @@ function openKidModal(kidId, kid) {
       list.appendChild(item);
     });
   }
+  const permanentCheckbox = document.createElement("input");
+  permanentCheckbox.type = "checkbox";
+  permanentCheckbox.id = "isPermanent";
+  
+  const permanentLabel = document.createElement("label");
+  permanentLabel.textContent = "הודעה קבועה";
+  permanentLabel.htmlFor = "isPermanent";
+  
+  form.appendChild(permanentLabel);
+  form.appendChild(permanentCheckbox);
 
   // טופס הוספת פעילות
   const form = document.createElement("form");
@@ -282,7 +299,8 @@ function openKidModal(kidId, kid) {
       date: dateInput.value,
       time: timeInput.value,
       title: titleInput.value,
-      repeatWeekly: repeatInput.checked
+      repeatWeekly: repeatInput.checked,
+      isPermanent: permanentCheckbox.checked
     };
     db.ref("kids/" + kidId + "/activities").set([...activities, newActivity]);
     openKidModal(kidId, { ...kid, activities: [...activities, newActivity] });
