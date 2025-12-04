@@ -179,10 +179,10 @@ function renderKids(kids) {
 
     box.appendChild(actList);
 
-    const cleaned = activities.filter(a => {
-      if (a.isPermanent) return true;   // נשאר תמיד
-      return a.date >= new Date(selectedDate).getDay();           // תאריכים שעברו נמחקים
-    });
+//    const cleaned = activities.filter(a => {
+//      if (a.isPermanent) return true;   // נשאר תמיד
+//      return a.date >= new Date(selectedDate).getDay();           // תאריכים שעברו נמחקים
+//    });
   
     if (cleaned.length !== activities.length) {
       db.ref("kids/" + id + "/activities").set(cleaned);
@@ -252,17 +252,7 @@ function openKidModal(kidId, kid) {
       list.appendChild(item);
     });
   }
-  const permanentCheckbox = document.createElement("input");
-  permanentCheckbox.type = "checkbox";
-  permanentCheckbox.id = "isPermanent";
-  
-  const permanentLabel = document.createElement("label");
-  permanentLabel.textContent = "הודעה קבועה";
-  permanentLabel.htmlFor = "isPermanent";
-  
-  form.appendChild(permanentLabel);
-  form.appendChild(permanentCheckbox);
-
+ 
   // טופס הוספת פעילות
   const form = document.createElement("form");
   form.className = "add-activity-form";
@@ -283,6 +273,14 @@ function openKidModal(kidId, kid) {
   repeatLabel.textContent = "פעילות חוזרת שבועית ";
   repeatLabel.appendChild(repeatInput);
 
+  // Checkbox הודעה קבועה
+  const permanentCheckbox = document.createElement("input");
+  permanentCheckbox.type = "checkbox";
+  const permanentLabel = document.createElement("label");
+  permanentLabel.textContent = "הודעה קבועה ";
+  permanentLabel.appendChild(permanentCheckbox);
+
+  
   const addBtn = document.createElement("button");
   addBtn.type = "submit"; addBtn.textContent = "הוסף פעילות";
 
@@ -290,6 +288,7 @@ function openKidModal(kidId, kid) {
   form.appendChild(timeInput);
   form.appendChild(titleInput);
   form.appendChild(repeatLabel);
+  form.appendChild(permanentLabel);
   form.appendChild(addBtn);
 
   form.addEventListener("submit", e => {
