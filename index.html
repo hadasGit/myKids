@@ -184,10 +184,10 @@ function renderKids(kids) {
 //      return a.date >= new Date(selectedDate).getDay();           // תאריכים שעברו נמחקים
 //    });
   
-    if (cleaned.length !== activities.length) {
-      db.ref("kids/" + id + "/activities").set(cleaned);
-      kid.activities = cleaned;
-    }
+//    if (cleaned.length !== activities.length) {
+ //     db.ref("kids/" + id + "/activities").set(cleaned);
+//      kid.activities = cleaned;
+//    }
     
     // כפתור מחיקה של ילד
     const delBtn = document.createElement("span");
