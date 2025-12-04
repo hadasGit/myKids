@@ -161,7 +161,7 @@ function renderKids(kids) {
     // פעילויות של היום
     const activities = kid.activities || [];
     const todaysActivities = activities.filter(a => 
-     a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === new Date(selectedDate).getDay())
+     !a.isPermanent || a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === new Date(selectedDate).getDay())
     );
 
     const actList = document.createElement("div");
@@ -189,8 +189,8 @@ function renderKids(kids) {
     }
 
     box.appendChild(actList);
-
-    const permanentNotes = activities.filter(a => a.isPermanent);
+    const today = new Date().toISOString().slice(0,10);
+    const permanentNotes = activities.filter(a => a.isPermanent && a.date >= today);
   
         permanentNotes.forEach(note => {
             const noteDiv = document.createElement("div");
@@ -202,6 +202,7 @@ function renderKids(kids) {
         
             box.appendChild(noteDiv);
         });  
+
     
 //    const cleaned = activities.filter(a => {
 //      if (a.isPermanent) return true;   // נשאר תמיד
