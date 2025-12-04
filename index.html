@@ -298,11 +298,19 @@ function openKidModal(kidId, kid) {
   repeatLabel.appendChild(repeatInput);
 
   // Checkbox הודעה קבועה
+//  const permanentCheckbox = document.createElement("input");
+//  permanentCheckbox.type = "checkbox";
+//  const permanentLabel = document.createElement("label");
+ // permanentLabel.textContent = "הודעה קבועה ";
+//  permanentLabel.appendChild(permanentCheckbox);
+  // Checkbox הודעה קבועה (עם ID עובד!)
   const permanentCheckbox = document.createElement("input");
   permanentCheckbox.type = "checkbox";
+  permanentCheckbox.id = "isPermanent";
+  
   const permanentLabel = document.createElement("label");
   permanentLabel.textContent = "הודעה קבועה ";
-  permanentLabel.appendChild(permanentCheckbox);
+  permanentLabel.setAttribute("for", "isPermanent");
 
   
   const addBtn = document.createElement("button");
