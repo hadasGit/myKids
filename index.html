@@ -26,6 +26,17 @@ h1 { text-align: center; }
 .add-activity-form input, .add-activity-form label { padding: 6px; font-size: 0.9rem; border-radius: 6px; border: 1px solid #ccc; }
 .add-activity-form button { padding: 8px; border-radius: 6px; border: 1px solid #ccc; background: #f5f5f5; cursor: pointer; }
 .add-activity-form button:hover { background: #e0e0e0; }
+.permanent-note {
+  background: #ffe5c2;      /* כתום בהיר */
+  color: #c45d00;           /* כתום כהה */
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 14px;
+  margin-top: 6px;
+  text-align: center;
+  font-weight: bold;
+  }
+
 </style>
 </head>
 <body>
@@ -150,7 +161,7 @@ function renderKids(kids) {
     // פעילויות של היום
     const activities = kid.activities || [];
     const todaysActivities = activities.filter(a => 
-     a.isPermanent || a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === new Date(selectedDate).getDay())
+     a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === new Date(selectedDate).getDay())
     );
 
     const actList = document.createElement("div");
@@ -175,6 +186,19 @@ function renderKids(kids) {
 
         actList.appendChild(aEl);
       });
+
+          const permanentNotes = activities.filter(a => a.isPermanent);
+    
+          permanentNotes.forEach(note => {
+              const noteDiv = document.createElement("div");
+              noteDiv.className = "permanent-note";
+          
+              // מציג גם תאריך וגם כותרת
+              const formattedDate = note.date ? note.date.split("-").reverse().join("-") : "";
+              noteDiv.textContent = `${formattedDate} — ${note.title}`;
+          
+              box.appendChild(noteDiv);
+          });  
     }
 
     box.appendChild(actList);
