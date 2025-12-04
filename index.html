@@ -173,19 +173,44 @@ function renderKids(kids) {
       actList.style.color = "#555";
     } else {
       todaysActivities.forEach(a => {
-        const aEl = document.createElement("div");
-        aEl.textContent = `${a.time || "--:--"} - ${a.title}`;
-        aEl.style.display = "flex";
-        aEl.style.justifyContent = "space-between";
+   //     const aEl = document.createElement("div");
+const aEl = document.createElement("div");
+aEl.style.display = "flex";
+aEl.style.justifyContent = "space-between";
+
+// טקסט ראשוני של הפעילות
+let text = `${a.time || "--:--"} - ${a.title}`;
+
+// אם הפעילות חוזרת שבועית
+if (a.repeatWeekly) {
+  text += " 🔁"; // מוסיף סמל חוזר
+  aEl.style.color = "#007BFF"; // כחול
+  aEl.style.fontWeight = "bold";
+}
+
+// אם הפעילות היא הסעה
+if (a.isTransport) {
+  text += " 🚗"; // מוסיף אייקון אוטו
+}
+
+aEl.textContent = text;
+
+actList.appendChild(aEl);
+
+
+        
+       // aEl.textContent = `${a.time || "--:--"} - ${a.title}`;
+      //  aEl.style.display = "flex";
+      //  aEl.style.justifyContent = "space-between";
 
         // אם הפעילות חוזרת שבועית
-        if (a.repeatWeekly) {
-          aEl.style.color = "#007BFF"; // כחול
-          aEl.style.fontWeight = "bold";
+       // if (a.repeatWeekly) {
+       //   aEl.style.color = "#007BFF"; // כחול
+        //  aEl.style.fontWeight = "bold";
         }
-         if (a.isTransport) text += " 🚗"; 
-        actList.appendChild(aEl);
-      });
+      //   if (a.isTransport) text += " 🚗"; 
+      //  actList.appendChild(aEl);
+    //  });
     }
 
     box.appendChild(actList);
