@@ -123,8 +123,11 @@ dateFilter.value = todayStr();
 
 document.getElementById("refreshBtn").addEventListener("click", () => {
     db.ref("kids").once("value").then(snapshot => {
-        const kids = snapshot.val();
-        renderKids(kids, dateFilter.value || null);
+        renderKids(snapshot.val());
+      
+     // snapshot => {
+      //  const kids = snapshot.val();
+      //  renderKids(kids, dateFilter.value || null);
     });
 });
 
@@ -328,6 +331,7 @@ function openKidModal(kidId, kid) {
   const permanentLabel = document.createElement("label");
   permanentLabel.textContent = "הודעה קבועה ";
   permanentLabel.setAttribute("for", "isPermanent");
+  permanentLabel.appendChild(permanentCheckbox);
 
   
   const addBtn = document.createElement("button");
