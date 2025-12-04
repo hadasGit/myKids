@@ -183,7 +183,7 @@ function renderKids(kids) {
           aEl.style.color = "#007BFF"; // כחול
           aEl.style.fontWeight = "bold";
         }
-
+         if (a.isTransport) text += " 🚗"; 
         actList.appendChild(aEl);
       });
     }
@@ -291,6 +291,13 @@ function openKidModal(kidId, kid) {
   const titleInput = document.createElement("input");
   titleInput.type = "text"; titleInput.required = true; titleInput.placeholder = "כותרת פעילות";
 
+  // Checkbox הסעה (אוטו)
+  const transportInput = document.createElement("input");
+  transportInput.type = "checkbox";
+  const transportLabel = document.createElement("label");
+  transportLabel.textContent = " 🚗 ";
+  transportLabel.appendChild(transportInput);
+
   // Checkbox פעילות חוזרת
   const repeatInput = document.createElement("input");
   repeatInput.type = "checkbox";
@@ -322,8 +329,10 @@ function openKidModal(kidId, kid) {
   form.appendChild(titleInput);
   form.appendChild(repeatLabel);
   form.appendChild(permanentLabel);
+  form.appendChild(transportLabel); 
   form.appendChild(addBtn);
 
+  
   form.addEventListener("submit", e => {
     e.preventDefault();
     const newActivity = {
@@ -332,7 +341,8 @@ function openKidModal(kidId, kid) {
       time: timeInput.value,
       title: titleInput.value,
       repeatWeekly: repeatInput.checked,
-      isPermanent: permanentCheckbox.checked
+      isPermanent: permanentCheckbox.checked,
+      isTransport: transportInput.checked
     };
     db.ref("kids/" + kidId + "/activities").set([...activities, newActivity]);
     openKidModal(kidId, { ...kid, activities: [...activities, newActivity] });
