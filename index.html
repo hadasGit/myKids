@@ -181,7 +181,7 @@ function renderKids(kids) {
 
     const cleaned = activities.filter(a => {
       if (a.isPermanent) return true;   // נשאר תמיד
-      return a.date >= today;           // תאריכים שעברו נמחקים
+      return a.date >= new Date(selectedDate).getDay();           // תאריכים שעברו נמחקים
     });
   
     if (cleaned.length !== activities.length) {
