@@ -279,20 +279,47 @@ function openKidModal(kidId, kid) {
     list.textContent = "אין פעילויות בתאריך זה.";
   } else {
     filtered.forEach(a => {
-      const item = document.createElement("div");
-      item.className = "activity-item";
-      item.textContent = `${a.date} ${a.time || ""} - ${a.title}${a.repeatWeekly ? " 🔁" : ""}`;
+     const item = document.createElement("div");
+item.className = "activity-item";
 
-      const delBtn = document.createElement("button");
-      delBtn.textContent = "×";
-      delBtn.onclick = () => {
-        const updated = activities.filter(act => act.id !== a.id);
-        db.ref("kids/" + kidId + "/activities").set(updated);
-        openKidModal(kidId, { ...kid, activities: updated });
-      };
+// כפתור עריכה
+const editBtn = document.createElement("button");
+editBtn.textContent = "✏️";
+editBtn.style.background = "#3b82f6";   // כחול
+editBtn.style.color = "white";
+editBtn.style.border = "none";
+editBtn.style.padding = "3px 6px";
+editBtn.style.borderRadius = "4px";
+editBtn.style.cursor = "pointer";
+editBtn.onclick = () => openEditActivityModal(kidId, kid, a);
 
-      item.appendChild(delBtn);
-      list.appendChild(item);
+// טקסט הפעילות
+const textSpan = document.createElement("span");
+textSpan.textContent = `${a.date} ${a.time || ""} - ${a.title}${a.repeatWeekly ? " 🔁" : ""}${a.isTransport ? " 🚗" : ""}`;
+
+// כפתור מחיקה
+const delBtn = document.createElement("button");
+delBtn.textContent = "×";
+delBtn.style.background = "red";
+delBtn.style.color = "white";
+delBtn.style.border = "none";
+delBtn.style.padding = "2px 6px";
+delBtn.style.borderRadius = "4px";
+delBtn.style.cursor = "pointer";
+delBtn.onclick = () => {
+  const updated = activities.filter(act => act.id !== a.id);
+  db.ref("kids/" + kidId + "/activities").set(updated);
+  openKidModal(kidId, { ...kid, activities: updated });
+};
+
+// הוספה לשורה
+item.appendChild(editBtn);
+item.appendChild(textSpan);
+item.appendChild(delBtn);
+
+list.appendChild(item);
+
+
     });
   }
  
@@ -364,6 +391,81 @@ function openKidModal(kidId, kid) {
   modalContent.appendChild(list);
   modalContent.appendChild(form);
 
+  modalBackdrop.style.display = "flex";
+}
+//מודל עריכה
+  function openEditActivityModal(kidId, kid, activity) {
+  modalTitle.textContent = "עריכת פעילות";
+  modalContent.innerHTML = "";
+
+  const form = document.createElement("form");
+  form.className = "add-activity-form";
+
+  const dateInput = document.createElement("input");
+  dateInput.type = "date";
+  dateInput.value = activity.date;
+
+  const timeInput = document.createElement("input");
+  timeInput.type = "time";
+  timeInput.value = activity.time;
+
+  const titleInput = document.createElement("input");
+  titleInput.type = "text";
+  titleInput.value = activity.title;
+
+  const repeatInput = document.createElement("input");
+  repeatInput.type = "checkbox";
+  repeatInput.checked = activity.repeatWeekly;
+  const repeatLabel = document.createElement("label");
+  repeatLabel.textContent = "פעילות חוזרת שבועית";
+  repeatLabel.appendChild(repeatInput);
+
+  const permanentInput = document.createElement("input");
+  permanentInput.type = "checkbox";
+  permanentInput.checked = activity.isPermanent;
+  const permanentLabel = document.createElement("label");
+  permanentLabel.textContent = "הודעה קבועה";
+  permanentLabel.appendChild(permanentInput);
+
+  const transportInput = document.createElement("input");
+  transportInput.type = "checkbox";
+  transportInput.checked = activity.isTransport;
+  const transportLabel = document.createElement("label");
+  transportLabel.textContent = " 🚗 ";
+  transportLabel.appendChild(transportInput);
+
+  const saveBtn = document.createElement("button");
+  saveBtn.type = "submit";
+  saveBtn.textContent = "שמור שינויים";
+
+  form.appendChild(dateInput);
+  form.appendChild(timeInput);
+  form.appendChild(titleInput);
+  form.appendChild(repeatLabel);
+  form.appendChild(permanentLabel);
+  form.appendChild(transportLabel);
+  form.appendChild(saveBtn);
+
+  form.addEventListener("submit", e => {
+    e.preventDefault();
+
+    const updatedAct = {
+      ...activity,
+      date: dateInput.value,
+      time: timeInput.value,
+      title: titleInput.value,
+      repeatWeekly: repeatInput.checked,
+      isPermanent: permanentInput.checked,
+      isTransport: transportInput.checked
+    };
+
+    const updatedList = kid.activities.map(a => a.id === activity.id ? updatedAct : a);
+
+    db.ref("kids/" + kidId + "/activities").set(updatedList);
+    openKidModal(kidId, { ...kid, activities: updatedList });
+  });
+
+  modalContent.appendChild(form);
   modalBackdrop.style.display = "flex";
 }
 
