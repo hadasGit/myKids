@@ -168,7 +168,7 @@ function renderKids(kids) {
     // פעילויות של היום
     const activities = kid.activities || [];
     const todaysActivities = activities.filter(a => 
-     !a.isPermanent || a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === new Date(selectedDate).getDay())
+     !a.isPermanent && (a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === new Date(selectedDate).getDay()))
     );
 
     const actList = document.createElement("div");
