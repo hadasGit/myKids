@@ -115,7 +115,11 @@ function getTodayDateStr() {
   const day = String(d.getDate()).padStart(2,"0");
   return `${year}-${month}-${day}`;
 }
-
+// פונקציה לקבלת תאריך היום בפורמט yyyy-mm-dd
+//function todayStr() {
+//  const d = new Date();
+//  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+//}
 function todayStr() {
   return new Date().toISOString().slice(0,10);
 }
@@ -251,11 +255,7 @@ function renderKids(kids) {
   });
 }
 
-// פונקציה לקבלת תאריך היום בפורמט yyyy-mm-dd
-function todayStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
+
 
 
 // ====== Modal פעילות ======
