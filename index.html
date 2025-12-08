@@ -268,12 +268,12 @@ if (permanentNotes.length) {
   notesContainer.style.gap = "4px";
   notesContainer.style.marginTop = "6px";
 
-  permanentNotes.forEach(note => {
+ permanentNotes.forEach(note => {
   const noteDiv = document.createElement("div");
   noteDiv.className = "permanent-note";
 
   const formattedDate = note.date ? note.date.split("-").reverse().join("-") : "";
-  
+
   // span לטקסט המקורי
   const textSpan = document.createElement("span");
   textSpan.textContent = `${formattedDate} — ${note.title}`;
@@ -325,18 +325,31 @@ if (permanentNotes.length) {
 
     saveBtn.onclick = ev => {
       ev.stopPropagation();
-      const newTitle = inputTitle.value;
+
+      const newTitle = inputTitle.value.trim();
       const newDate = inputDate.value;
 
+      if (!newTitle || !newDate) {
+        alert("אנא מלא כותרת ותאריך.");
+        return;
+      }
+
+      // עדכון אובייקט ההודעה
       const updatedAct = { ...note, title: newTitle, date: newDate };
+
+      // עדכון רשימת פעילויות
       const updated = activities.map(a => a.id === note.id ? updatedAct : a);
 
-      db.ref("kids/" + id + "/activities").set(updated);
+      // שמירה ב־Firebase
+      db.ref("kids/" + id + "/activities").set(updated)
+        .then(() => {
+          // אחרי שמירה, רנדר מחדש את כל הילדים
+          renderKids(dbData); // dbData = הנתונים מה־Firebase, או טען שוב עם db.ref("kids").once("value")
+        })
+        .catch(err => console.error("Error updating note:", err));
     };
   };
 
-
-    
     notesContainer.appendChild(noteDiv);
   });
 
