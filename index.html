@@ -269,67 +269,72 @@ if (permanentNotes.length) {
   notesContainer.style.marginTop = "6px";
 
   permanentNotes.forEach(note => {
-    const noteDiv = document.createElement("div");
-    noteDiv.className = "permanent-note";
-    const formattedDate = note.date ? note.date.split("-").reverse().join("-") : "";
-    noteDiv.textContent = `${formattedDate} — ${note.title}`;
+  const noteDiv = document.createElement("div");
+  noteDiv.className = "permanent-note";
 
-    // כפתור מחיקה קטן
-    const delBtn = document.createElement("span");
-    delBtn.textContent = "×";
-    delBtn.className = "del-btn";
-    delBtn.onclick = e => {
-      e.stopPropagation();
-      if (confirm(`למחוק הודעה קבועה זו?`)) {
-        const updated = activities.filter(a => a.id !== note.id);
-        db.ref("kids/" + id + "/activities").set(updated);
-      }
-    };
+  const formattedDate = note.date ? note.date.split("-").reverse().join("-") : "";
+  
+  // span לטקסט המקורי
+  const textSpan = document.createElement("span");
+  textSpan.textContent = `${formattedDate} — ${note.title}`;
+  noteDiv.appendChild(textSpan);
 
-    // hover effect להצגת כפתור המחיקה
-    noteDiv.onmouseover = () => delBtn.style.display = "inline-block";
-    noteDiv.onmouseout = () => delBtn.style.display = "none";
-
-    noteDiv.appendChild(delBtn);
-      // עריכה inline בלחיצה כפולה
-    noteDiv.ondblclick = e => {
-  e.stopPropagation();
-
-  // הסתירו את תוכן ההודעה הקיים
-  const originalText = noteDiv.textContent;
-  noteDiv.textContent = "";
-
-  // צור טופס לעריכה
-  const inputTitle = document.createElement("input");
-  inputTitle.type = "text";
-  inputTitle.value = note.title;
-  inputTitle.style.width = "60%";
-  inputTitle.style.fontSize = "12px";
-
-  const inputDate = document.createElement("input");
-  inputDate.type = "date";
-  inputDate.value = note.date;
-  inputDate.style.fontSize = "12px";
-
-  const saveBtn = document.createElement("button");
-  saveBtn.textContent = "שמור";
-  saveBtn.style.fontSize = "12px";
-
-  noteDiv.appendChild(inputTitle);
-  noteDiv.appendChild(inputDate);
-  noteDiv.appendChild(saveBtn);
-
-  saveBtn.onclick = ev => {
-    ev.stopPropagation();
-    const newTitle = inputTitle.value;
-    const newDate = inputDate.value;
-
-    const updatedAct = { ...note, title: newTitle, date: newDate };
-    const updated = activities.map(a => a.id === note.id ? updatedAct : a);
-
-    db.ref("kids/" + id + "/activities").set(updated);
+  // כפתור מחיקה קטן
+  const delBtn = document.createElement("span");
+  delBtn.textContent = "×";
+  delBtn.className = "del-btn";
+  delBtn.onclick = e => {
+    e.stopPropagation();
+    if (confirm(`למחוק הודעה קבועה זו?`)) {
+      const updated = activities.filter(a => a.id !== note.id);
+      db.ref("kids/" + id + "/activities").set(updated);
+    }
   };
-};
+  noteDiv.appendChild(delBtn);
+
+  // hover effect להצגת כפתור המחיקה
+  noteDiv.onmouseover = () => delBtn.style.display = "inline-block";
+  noteDiv.onmouseout = () => delBtn.style.display = "none";
+
+  // עריכה inline בלחיצה כפולה
+  noteDiv.ondblclick = e => {
+    e.stopPropagation();
+
+    // הסתירו את הטקסט המקורי
+    textSpan.style.display = "none";
+
+    // צור טופס לעריכה
+    const inputTitle = document.createElement("input");
+    inputTitle.type = "text";
+    inputTitle.value = note.title;
+    inputTitle.style.width = "60%";
+    inputTitle.style.fontSize = "12px";
+
+    const inputDate = document.createElement("input");
+    inputDate.type = "date";
+    inputDate.value = note.date;
+    inputDate.style.fontSize = "12px";
+
+    const saveBtn = document.createElement("button");
+    saveBtn.textContent = "שמור";
+    saveBtn.style.fontSize = "12px";
+
+    noteDiv.appendChild(inputTitle);
+    noteDiv.appendChild(inputDate);
+    noteDiv.appendChild(saveBtn);
+
+    saveBtn.onclick = ev => {
+      ev.stopPropagation();
+      const newTitle = inputTitle.value;
+      const newDate = inputDate.value;
+
+      const updatedAct = { ...note, title: newTitle, date: newDate };
+      const updated = activities.map(a => a.id === note.id ? updatedAct : a);
+
+      db.ref("kids/" + id + "/activities").set(updated);
+    };
+  };
+
 
     
     notesContainer.appendChild(noteDiv);
