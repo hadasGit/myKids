@@ -237,7 +237,67 @@ function renderKids(kids) {
 
     box.appendChild(actList);
     const today = new Date().toISOString().slice(0,10);
-    const permanentNotes = activities.filter(a => a.isPermanent && a.date >= today);
+  // ---- הודעות קבועות ----
+const permanentNotes = activities.filter(a => a.isPermanent && a.date >= today);
+if (permanentNotes.length) {
+  const notesContainer = document.createElement("div");
+  notesContainer.style.display = "flex";
+  notesContainer.style.flexWrap = "wrap";
+  notesContainer.style.gap = "4px";
+  notesContainer.style.marginTop = "6px";
+
+  permanentNotes.forEach(note => {
+    const noteDiv = document.createElement("div");
+    noteDiv.className = "permanent-note";
+    noteDiv.style.background = "#ffe5c2";   // כתום בהיר
+    noteDiv.style.color = "#c45d00";       // כתום כהה
+    noteDiv.style.padding = "4px 8px";
+    noteDiv.style.borderRadius = "8px";
+    noteDiv.style.fontSize = "12px";
+    noteDiv.style.fontWeight = "bold";
+    noteDiv.style.position = "relative";
+    noteDiv.style.whiteSpace = "nowrap";
+    noteDiv.style.cursor = "pointer";
+    noteDiv.style.transition = "all 0.2s";
+
+    const formattedDate = note.date ? note.date.split("-").reverse().join("-") : "";
+    noteDiv.textContent = `${formattedDate} — ${note.title}`;
+
+    // כפתור מחיקה קטן
+    const delBtn = document.createElement("span");
+    delBtn.textContent = "×";
+    delBtn.style.position = "absolute";
+    delBtn.style.top = "2px";
+    delBtn.style.right = "4px";
+    delBtn.style.background = "red";
+    delBtn.style.color = "white";
+    delBtn.style.borderRadius = "50%";
+    delBtn.style.padding = "0 4px";
+    delBtn.style.fontSize = "10px";
+    delBtn.style.display = "none";
+    delBtn.style.cursor = "pointer";
+
+    delBtn.onclick = e => {
+      e.stopPropagation();
+      if (confirm(`למחוק הודעה קבועה זו?`)) {
+        const updated = activities.filter(a => a.id !== note.id);
+        db.ref("kids/" + id + "/activities").set(updated);
+      }
+    };
+
+    // hover effect להצגת כפתור המחיקה
+    noteDiv.onmouseover = () => delBtn.style.display = "inline-block";
+    noteDiv.onmouseout = () => delBtn.style.display = "none";
+
+    noteDiv.appendChild(delBtn);
+    notesContainer.appendChild(noteDiv);
+  });
+
+  box.appendChild(notesContainer);
+}
+
+    
+   /* const permanentNotes = activities.filter(a => a.isPermanent && a.date >= today);
   
         permanentNotes.forEach(note => {
             const noteDiv = document.createElement("div");
@@ -249,7 +309,7 @@ function renderKids(kids) {
         
             box.appendChild(noteDiv);
         });  
-
+*/
     
 //    const cleaned = activities.filter(a => {
 //      if (a.isPermanent) return true;   // נשאר תמיד
