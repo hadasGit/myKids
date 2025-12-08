@@ -262,77 +262,118 @@ function renderKids(kids) {
   });
 }
 
-
-
-
-
-
-// ====== Modal פעילות ======
 function openKidModal(kidId, kid) {
   currentKidId = kidId;
   modalTitle.textContent = kid.name;
   modalContent.innerHTML = "";
 
   const selectedDate = dateFilter.value || todayStr();
+  const today = todayStr();
 
-  // רשימת פעילויות
+  const activities = kid.activities || [];
+
+  // ---- רשימות לפי סוג ----
+  const todaysActivities = activities.filter(a => !a.isPermanent && !a.repeatWeekly && a.date === selectedDate);
+  const weeklyActivities = activities.filter(a => !a.isPermanent && a.repeatWeekly && new Date(selectedDate).getDay() === new Date(a.date).getDay());
+  const permanentNotes = activities.filter(a => a.isPermanent && a.date >= today);
+
+  const createActivityItem = (a, color="#555") => {
+    const item = document.createElement("div");
+    item.className = "activity-item";
+
+    // כפתור עריכה
+    const editBtn = document.createElement("button");
+    editBtn.textContent = "✏️";
+    editBtn.style.background = "#3b82f6";   // כחול
+    editBtn.style.color = "white";
+    editBtn.style.border = "none";
+    editBtn.style.padding = "3px 6px";
+    editBtn.style.borderRadius = "4px";
+    editBtn.style.cursor = "pointer";
+    editBtn.onclick = e => {
+      e.stopPropagation();
+      openEditActivityModal(kidId, kid, a);
+    };
+
+    // טקסט הפעילות
+    const textSpan = document.createElement("span");
+    textSpan.textContent = `${a.date} ${a.time || ""} - ${a.title}${a.repeatWeekly ? " 🔁" : ""}${a.isTransport ? " 🚗" : ""}`;
+    textSpan.style.color = color;
+    textSpan.style.fontWeight = a.repeatWeekly ? "bold" : "normal";
+
+    // כפתור מחיקה
+    const delBtn = document.createElement("button");
+    delBtn.textContent = "×";
+    delBtn.style.background = "red";
+    delBtn.style.color = "white";
+    delBtn.style.border = "none";
+    delBtn.style.padding = "2px 6px";
+    delBtn.style.borderRadius = "4px";
+    delBtn.style.cursor = "pointer";
+    delBtn.onclick = e => {
+      e.stopPropagation();
+      const updated = activities.filter(act => act.id !== a.id);
+      db.ref("kids/" + kidId + "/activities").set(updated);
+      openKidModal(kidId, { ...kid, activities: updated });
+    };
+
+    item.appendChild(editBtn);
+    item.appendChild(textSpan);
+    item.appendChild(delBtn);
+
+    return item;
+  };
+
+  // ---- Container לכל סוג פעילות ----
   const list = document.createElement("div");
   list.className = "activity-list";
 
-  const activities = kid.activities || [];
-  const filtered = activities.filter(a => 
-    a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === new Date(selectedDate).getDay())
-  );
+  // פעילויות רגילות
+  if (todaysActivities.length) {
+    const header = document.createElement("div");
+    header.textContent = "פעילויות היום:";
+    header.style.fontWeight = "bold";
+    header.style.marginTop = "6px";
+    list.appendChild(header);
+    todaysActivities.forEach(a => list.appendChild(createActivityItem(a)));
+  }
 
-  if (!filtered.length) {
-    list.textContent = "אין פעילויות בתאריך זה.";
-  } else {
-    filtered.forEach(a => {
-     const item = document.createElement("div");
-item.className = "activity-item";
+  // פעילויות חוזרות
+  if (weeklyActivities.length) {
+    const header = document.createElement("div");
+    header.textContent = "פעילויות חוזרות שבועיות:";
+    header.style.fontWeight = "bold";
+    header.style.color = "#007BFF";
+    header.style.marginTop = "6px";
+    list.appendChild(header);
+    weeklyActivities.forEach(a => list.appendChild(createActivityItem(a, "#007BFF")));
+  }
 
-// כפתור עריכה
-const editBtn = document.createElement("button");
-editBtn.textContent = "✏️";
-editBtn.style.background = "#3b82f6";   // כחול
-editBtn.style.color = "white";
-editBtn.style.border = "none";
-editBtn.style.padding = "3px 6px";
-editBtn.style.borderRadius = "4px";
-editBtn.style.cursor = "pointer";
-editBtn.onclick = () => openEditActivityModal(kidId, kid, a);
-
-// טקסט הפעילות
-const textSpan = document.createElement("span");
-textSpan.textContent = `${a.date} ${a.time || ""} - ${a.title}${a.repeatWeekly ? " 🔁" : ""}${a.isTransport ? " 🚗" : ""}`;
-
-// כפתור מחיקה
-const delBtn = document.createElement("button");
-delBtn.textContent = "×";
-delBtn.style.background = "red";
-delBtn.style.color = "white";
-delBtn.style.border = "none";
-delBtn.style.padding = "2px 6px";
-delBtn.style.borderRadius = "4px";
-delBtn.style.cursor = "pointer";
-delBtn.onclick = () => {
-  const updated = activities.filter(act => act.id !== a.id);
-  db.ref("kids/" + kidId + "/activities").set(updated);
-  openKidModal(kidId, { ...kid, activities: updated });
-};
-
-// הוספה לשורה
-item.appendChild(editBtn);
-item.appendChild(textSpan);
-item.appendChild(delBtn);
-
-list.appendChild(item);
-
-
+  // הודעות קבועות
+  if (permanentNotes.length) {
+    const header = document.createElement("div");
+    header.textContent = "הודעות קבועות:";
+    header.style.fontWeight = "bold";
+    header.style.color = "#c45d00";
+    header.style.marginTop = "6px";
+    list.appendChild(header);
+    permanentNotes.forEach(note => {
+      const noteDiv = document.createElement("div");
+      noteDiv.className = "permanent-note";
+      const formattedDate = note.date ? note.date.split("-").reverse().join("-") : "";
+      noteDiv.textContent = `${formattedDate} — ${note.title}`;
+      list.appendChild(noteDiv);
     });
   }
- 
-  // טופס הוספת פעילות
+
+  if (!todaysActivities.length && !weeklyActivities.length && !permanentNotes.length) {
+    const empty = document.createElement("div");
+    empty.textContent = "אין פעילויות בתאריך זה.";
+    empty.style.color = "#555";
+    list.appendChild(empty);
+  }
+
+  // ---- טופס הוספת פעילות ----
   const form = document.createElement("form");
   form.className = "add-activity-form";
 
@@ -345,31 +386,26 @@ list.appendChild(item);
   const titleInput = document.createElement("input");
   titleInput.type = "text"; titleInput.required = true; titleInput.placeholder = "כותרת פעילות";
 
-  // Checkbox הסעה (אוטו)
   const transportInput = document.createElement("input");
   transportInput.type = "checkbox";
   const transportLabel = document.createElement("label");
   transportLabel.textContent = " 🚗 ";
   transportLabel.appendChild(transportInput);
 
-  // Checkbox פעילות חוזרת
   const repeatInput = document.createElement("input");
   repeatInput.type = "checkbox";
   const repeatLabel = document.createElement("label");
   repeatLabel.textContent = "פעילות חוזרת שבועית ";
   repeatLabel.appendChild(repeatInput);
 
-  // Checkbox הודעה קבועה (עם ID עובד!)
   const permanentCheckbox = document.createElement("input");
   permanentCheckbox.type = "checkbox";
   permanentCheckbox.id = "isPermanent";
-  
   const permanentLabel = document.createElement("label");
   permanentLabel.textContent = "הודעה קבועה ";
   permanentLabel.setAttribute("for", "isPermanent");
   permanentLabel.appendChild(permanentCheckbox);
 
-  
   const addBtn = document.createElement("button");
   addBtn.type = "submit"; addBtn.textContent = "הוסף פעילות";
 
@@ -381,7 +417,6 @@ list.appendChild(item);
   form.appendChild(transportLabel); 
   form.appendChild(addBtn);
 
-  
   form.addEventListener("submit", e => {
     e.preventDefault();
     const newActivity = {
@@ -399,9 +434,12 @@ list.appendChild(item);
 
   modalContent.appendChild(list);
   modalContent.appendChild(form);
-
   modalBackdrop.style.display = "flex";
 }
+
+
+
+
 //מודל עריכה
   function openEditActivityModal(kidId, kid, activity) {
   modalTitle.textContent = "עריכת פעילות";
