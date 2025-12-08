@@ -57,8 +57,30 @@ h1 { text-align: center; }
   margin-top: 6px;
   text-align: center;
   font-weight: bold;
-  }
+  position: relative;       /* מאפשר למקם כפתור מחיקה */
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s;
+}
 
+/* כפתור מחיקה בתוך הכרטיסיה */
+.permanent-note .del-btn {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  background: red;
+  color: white;
+  border-radius: 50%;
+  padding: 0 4px;
+  font-size: 10px;
+  display: none;           /* מופיע רק ב-hover */
+  cursor: pointer;
+}
+
+/* הצגת כפתור המחיקה כשעוברים עם העכבר על הכרטיסיה */
+.permanent-note:hover .del-btn {
+  display: inline-block;
+} 
 </style>
 </head>
 <body>
@@ -249,34 +271,13 @@ if (permanentNotes.length) {
   permanentNotes.forEach(note => {
     const noteDiv = document.createElement("div");
     noteDiv.className = "permanent-note";
-    noteDiv.style.background = "#ffe5c2";   // כתום בהיר
-    noteDiv.style.color = "#c45d00";       // כתום כהה
-    noteDiv.style.padding = "4px 8px";
-    noteDiv.style.borderRadius = "8px";
-    noteDiv.style.fontSize = "12px";
-    noteDiv.style.fontWeight = "bold";
-    noteDiv.style.position = "relative";
-    noteDiv.style.whiteSpace = "nowrap";
-    noteDiv.style.cursor = "pointer";
-    noteDiv.style.transition = "all 0.2s";
-
     const formattedDate = note.date ? note.date.split("-").reverse().join("-") : "";
     noteDiv.textContent = `${formattedDate} — ${note.title}`;
 
     // כפתור מחיקה קטן
     const delBtn = document.createElement("span");
     delBtn.textContent = "×";
-    delBtn.style.position = "absolute";
-    delBtn.style.top = "2px";
-    delBtn.style.right = "4px";
-    delBtn.style.background = "red";
-    delBtn.style.color = "white";
-    delBtn.style.borderRadius = "50%";
-    delBtn.style.padding = "0 4px";
-    delBtn.style.fontSize = "10px";
-    delBtn.style.display = "none";
-    delBtn.style.cursor = "pointer";
-
+    delBtn.className = "del-btn";
     delBtn.onclick = e => {
       e.stopPropagation();
       if (confirm(`למחוק הודעה קבועה זו?`)) {
