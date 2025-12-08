@@ -168,12 +168,12 @@ addKidBtn.addEventListener("click", () => {
 db.ref("kids").on("value", snapshot => {
   renderKids(snapshot.val());
 });
-
 function renderKids(kids) {
   kidsContainer.innerHTML = "";
   if (!kids) return;
 
   const selectedDate = dateFilter.value || todayStr();
+  const today = todayStr();
 
   Object.keys(kids).forEach(id => {
     const kid = kids[id];
@@ -187,80 +187,62 @@ function renderKids(kids) {
     nameEl.style.marginBottom = "6px";
     box.appendChild(nameEl);
 
-    // פעילויות של היום
     const activities = kid.activities || [];
+
+    // ---- פעילויות רגילות ----
     const todaysActivities = activities.filter(a => 
-     !a.isPermanent && (a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === new Date(selectedDate).getDay()))
+      !a.isPermanent && !a.repeatWeekly && a.date === selectedDate
     );
-
-    const actList = document.createElement("div");
-    actList.style.marginTop = "6px";
-    actList.style.fontSize = "0.9rem";
-
-    if (todaysActivities.length === 0) {
-      actList.textContent = "אין פעילויות היום";
-      actList.style.color = "#555";
-    } else {
+    const listToday = document.createElement("div");
+    if (todaysActivities.length) {
       todaysActivities.forEach(a => {
-  
         const aEl = document.createElement("div");
-        aEl.style.display = "flex";
-        aEl.style.alignItems = "center";
-        aEl.style.justifyContent = "space-between";
-        aEl.style.whiteSpace = "nowrap";
-        aEl.style.width = "100%";
-
-        // טקסט ראשוני של הפעילות
-        let text = `${a.time || "--:--"} - ${a.title}`;
-        
-        // אם הפעילות חוזרת שבועית
-        if (a.repeatWeekly) {
-          text += " 🔁"; // מוסיף סמל חוזר
-          aEl.style.color = "#007BFF"; // כחול
-          aEl.style.fontWeight = "bold";
-        }
-        
-        // אם הפעילות היא הסעה
-        if (a.isTransport) {
-          text += " 🚗"; // מוסיף אייקון אוטו
-        }
-        
-        aEl.textContent = text;
-        
-        actList.appendChild(aEl);
-
-
-        
-    
-     });
+        aEl.textContent = `${a.time || "--:--"} - ${a.title}${a.isTransport ? " 🚗" : ""}`;
+        aEl.style.color = "#555";
+        aEl.style.marginBottom = "2px";
+        listToday.appendChild(aEl);
+      });
     }
 
-    box.appendChild(actList);
-    const today = new Date().toISOString().slice(0,10);
-    const permanentNotes = activities.filter(a => a.isPermanent && a.date >= today);
-  
-        permanentNotes.forEach(note => {
-            const noteDiv = document.createElement("div");
-            noteDiv.className = "permanent-note";
-        
-            // מציג גם תאריך וגם כותרת
-            const formattedDate = note.date ? note.date.split("-").reverse().join("-") : "";
-            noteDiv.textContent = `${formattedDate} — ${note.title}`;
-        
-            box.appendChild(noteDiv);
-        });  
+    // ---- פעילויות חוזרות שבועיות ----
+    const weeklyActivities = activities.filter(a => 
+      !a.isPermanent && a.repeatWeekly && new Date(selectedDate).getDay() === new Date(a.date).getDay()
+    );
+    const listWeekly = document.createElement("div");
+    if (weeklyActivities.length) {
+      weeklyActivities.forEach(a => {
+        const aEl = document.createElement("div");
+        aEl.textContent = `${a.time || "--:--"} - ${a.title} 🔁${a.isTransport ? " 🚗" : ""}`;
+        aEl.style.color = "#007BFF";
+        aEl.style.fontWeight = "bold";
+        aEl.style.marginBottom = "2px";
+        listWeekly.appendChild(aEl);
+      });
+    }
 
-    
-//    const cleaned = activities.filter(a => {
-//      if (a.isPermanent) return true;   // נשאר תמיד
-//      return a.date >= new Date(selectedDate).getDay();           // תאריכים שעברו נמחקים
-//    });
-  
-//    if (cleaned.length !== activities.length) {
- //     db.ref("kids/" + id + "/activities").set(cleaned);
-//      kid.activities = cleaned;
-//    }
-    
+    // ---- הודעות קבועות ----
+    const permanentNotes = activities.filter(a => a.isPermanent && a.date >= today);
+    const listPermanent = document.createElement("div");
+    permanentNotes.forEach(note => {
+      const noteDiv = document.createElement("div");
+      noteDiv.className = "permanent-note";
+      const formattedDate = note.date ? note.date.split("-").reverse().join("-") : "";
+      noteDiv.textContent = `${formattedDate} — ${note.title}`;
+      listPermanent.appendChild(noteDiv);
+    });
+
+    // ---- הצגה בסדר ----
+    if (!todaysActivities.length && !weeklyActivities.length && !permanentNotes.length) {
+      const empty = document.createElement("div");
+      empty.textContent = "אין פעילויות היום";
+      empty.style.color = "#555";
+      box.appendChild(empty);
+    } else {
+      if (listToday.childElementCount) box.appendChild(listToday);
+      if (listWeekly.childElementCount) box.appendChild(listWeekly);
+      if (listPermanent.childElementCount) box.appendChild(listPermanent);
+    }
+
     // כפתור מחיקה של ילד
     const delBtn = document.createElement("span");
     delBtn.textContent = "×";
@@ -279,6 +261,8 @@ function renderKids(kids) {
     kidsContainer.appendChild(box);
   });
 }
+
+
 
 
 
