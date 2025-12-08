@@ -291,6 +291,26 @@ if (permanentNotes.length) {
     noteDiv.onmouseout = () => delBtn.style.display = "none";
 
     noteDiv.appendChild(delBtn);
+      // עריכה inline בלחיצה כפולה
+    noteDiv.ondblclick = e => {
+      e.stopPropagation();
+      // מחליף את התוכן בטופס קצר
+      noteDiv.innerHTML = `
+        <input type="text" value="${note.title}" style="width: 60%; font-size:12px;"/>
+        <input type="date" value="${note.date}" style="font-size:12px;"/>
+        <button style="font-size:12px;">שמור</button>
+      `;
+      const saveBtn = noteDiv.querySelector("button");
+      saveBtn.onclick = ev => {
+        ev.stopPropagation();
+        const newTitle = noteDiv.querySelector('input[type="text"]').value;
+        const newDate = noteDiv.querySelector('input[type="date"]').value;
+        const updatedAct = { ...note, title: newTitle, date: newDate };
+        const updated = activities.map(a => a.id === note.id ? updatedAct : a);
+        db.ref("kids/" + id + "/activities").set(updated);
+      };
+    };
+    
     notesContainer.appendChild(noteDiv);
   });
 
