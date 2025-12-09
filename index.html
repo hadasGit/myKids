@@ -433,7 +433,7 @@ function shareKid(kidId, kid) {
     from: currentUserId // מזהה המשתמש ששולח
   })
   .then(() => {
-    const link = `${window.location.origin}/share.html?id=${shareId}`;
+    const link = `${window.location.origin}/myKids/share.html?id=${shareId}`;
     prompt("קישור לשיתוף עם משתמש אחר:", link);
   })
   .catch(err => console.error("שגיאה בשיתוף:", err));
