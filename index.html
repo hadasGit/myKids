@@ -136,6 +136,15 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
+// יצירת מזהה משתמש אוטומטי ושמירתו בדפדפן
+let currentUserId = localStorage.getItem("currentUserId");
+
+if (!currentUserId) {
+  currentUserId = "user_" + Math.random().toString(36).substr(2, 9);
+  localStorage.setItem("currentUserId", currentUserId);
+}
+
+console.log("User ID:", currentUserId);
 
 const kidsContainer = document.getElementById("kids-container");
 const addKidBtn = document.getElementById("addKidBtn");
@@ -412,6 +421,7 @@ if (permanentNotes.length) {
     kidsContainer.appendChild(box);
   });
 }
+db.ref("kids/" + targetUserId + "/" + kidId).set(kidData);
 
 function shareKid(kidId, kid) {
   // צור מזהה ייחודי לשיתוף
