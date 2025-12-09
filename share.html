@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>קבלת שיתוף</title>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+</head>
+<body>
+<h1>הוספת ילד משותף</h1>
+<script>
+const firebaseConfig = {
+  // ...הגדרות Firebase שלך...
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// מזהה המשתמש הנוכחי (צריך להיות זמין מהאפליקציה, למשל Firebase Auth)
+const currentUserId = "USER_2_ID"; // החלף בזה את מזהה המשתמש הנוכחי
+
+const urlParams = new URLSearchParams(window.location.search);
+const shareId = urlParams.get("id");
+
+if (shareId) {
+  db.ref("shared/" + shareId).once("value").then(snapshot => {
+    const sharedData = snapshot.val();
+    if (!sharedData) {
+      alert("קישור השיתוף אינו תקין.");
+      return;
+    }
+
+    const newKid = sharedData.kid;
+
+    // דחיפת הילד החדש תחת המשתמש הנוכחי
+    db.ref(`kids/${currentUserId}`).push(newKid)
+      .then(() => {
+        alert("הילד נוסף בהצלחה!");
+        window.location.href = "/"; // חזרה לעמוד הראשי עם הכרטיסיות
+      })
+      .catch(err => console.error("שגיאה בהוספת הילד:", err));
+  });
+} else {
+  alert("לא נמצא מזהה שיתוף.");
+}
+</script>
+</body>
+</html>
