@@ -1,47 +1,38 @@
-<!DOCTYPE html>
-<html lang="he" dir="rtl">
-<head>
-<meta charset="UTF-8">
-<title>קבלת שיתוף</title>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-</head>
-<body>
-<h1>הוספת ילד משותף</h1>
 <script>
-const firebaseConfig = {
-  // ...הגדרות Firebase שלך...
-};
-firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// מזהה המשתמש הנוכחי (צריך להיות זמין מהאפליקציה, למשל Firebase Auth)
-const currentUserId = "USER_2_ID"; // החלף בזה את מזהה המשתמש הנוכחי
+// אותו יצירת מזהה משתמש כמו בקובץ הראשי
+let currentUserId = localStorage.getItem("currentUserId");
+if (!currentUserId) {
+  currentUserId = "user_" + Math.random().toString(36).substr(2, 9);
+  localStorage.setItem("currentUserId", currentUserId);
+}
 
+// קבלת ה-ID מהלינק
 const urlParams = new URLSearchParams(window.location.search);
 const shareId = urlParams.get("id");
 
-if (shareId) {
-  db.ref("shared/" + shareId).once("value").then(snapshot => {
-    const sharedData = snapshot.val();
-    if (!sharedData) {
-      alert("קישור השיתוף אינו תקין.");
-      return;
-    }
-
-    const newKid = sharedData.kid;
-
-    // דחיפת הילד החדש תחת המשתמש הנוכחי
-    db.ref(`kids/${currentUserId}`).push(newKid)
-      .then(() => {
-        alert("הילד נוסף בהצלחה!");
-        window.location.href = "/"; // חזרה לעמוד הראשי עם הכרטיסיות
-      })
-      .catch(err => console.error("שגיאה בהוספת הילד:", err));
-  });
-} else {
-  alert("לא נמצא מזהה שיתוף.");
+if (!shareId) {
+  document.body.innerHTML = "קישור לא תקין.";
 }
+
+// הבאת הנתונים מה-share
+db.ref("shared/" + shareId).once("value").then(snapshot => {
+  const data = snapshot.val();
+
+  if (!data) {
+    document.body.innerHTML = "הנתונים כבר שותפו או שהקישור לא תקין.";
+    return;
+  }
+
+  const kidData = data.kid; 
+  const kidId = kidData.id || ("kid_" + Date.now());
+
+  // 👈 ***כאן*** משתמשים בשורה שדיברנו עליה
+  db.ref("kids/" + currentUserId + "/" + kidId).set(kidData)
+    .then(() => {
+      document.body.innerHTML = "הילד נוסף לכרטיסיות שלך בהצלחה!";
+    });
+
+});
 </script>
-</body>
-</html>
