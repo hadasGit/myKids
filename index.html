@@ -354,6 +354,19 @@ if (permanentNotes.length) {
   });
 
   box.appendChild(notesContainer);
+  // כפתור שיתוף
+  const shareBtn = document.createElement("button");
+  shareBtn.textContent = "שתף";
+  shareBtn.style.marginTop = "6px";
+  shareBtn.style.fontSize = "12px";
+  shareBtn.style.padding = "4px 8px";
+  shareBtn.style.cursor = "pointer";
+  shareBtn.onclick = e => {
+    e.stopPropagation(); // למנוע פתיחת Modal
+    shareKid(id, kid);
+  };
+  
+  box.appendChild(shareBtn);
 }
 
     
@@ -400,6 +413,21 @@ if (permanentNotes.length) {
   });
 }
 
+function shareKid(kidId, kid) {
+  // צור מזהה ייחודי לשיתוף
+  const shareId = "share_" + Date.now();
+
+  // שמור ב-Firebase תחת /shared
+  db.ref("shared/" + shareId).set({
+    kid,
+    from: currentUserId // מזהה המשתמש ששולח
+  })
+  .then(() => {
+    const link = `${window.location.origin}/share.html?id=${shareId}`;
+    prompt("קישור לשיתוף עם משתמש אחר:", link);
+  })
+  .catch(err => console.error("שגיאה בשיתוף:", err));
+}
 
 
 
