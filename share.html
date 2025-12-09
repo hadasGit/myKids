@@ -1,38 +1,71 @@
-<script>
-const db = firebase.database();
+<!DOCTYPE html>
+<html lang="he">
+<head>
+  <meta charset="UTF-8">
+  <title>שיתוף ילד</title>
+</head>
+<body>
 
-// אותו יצירת מזהה משתמש כמו בקובץ הראשי
-let currentUserId = localStorage.getItem("currentUserId");
-if (!currentUserId) {
-  currentUserId = "user_" + Math.random().toString(36).substr(2, 9);
-  localStorage.setItem("currentUserId", currentUserId);
-}
+  <h2>טוען נתוני שיתוף...</h2>
 
-// קבלת ה-ID מהלינק
-const urlParams = new URLSearchParams(window.location.search);
-const shareId = urlParams.get("id");
+  <!-- 1. טוען את Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
-if (!shareId) {
-  document.body.innerHTML = "קישור לא תקין.";
-}
+  <!-- 2. Firebase config – להחליף בשלך -->
+  <script>
+const firebaseConfig = {
+  apiKey: "AIzaSyD9IzSor82cM39XgdLbywBdq-bM8m2c_ak",
+  authDomain: "mykids-3f832.firebaseapp.com",
+  projectId: "mykids-3f832",
+  storageBucket: "mykids-3f832.firebasestorage.app",
+  messagingSenderId: "869870400492",
+  appId: "1:869870400492:web:80200b8102afb53e1c06c9",
+  measurementId: "G-Q3X18J3SJ4",
+  databaseURL:  "https://mykids-3f832-default-rtdb.firebaseio.com"
+};
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+  </script>
 
-// הבאת הנתונים מה-share
-db.ref("shared/" + shareId).once("value").then(snapshot => {
-  const data = snapshot.val();
+  <!-- 3. קוד ה-share -->
+  <script>
+    const url = new URL(window.location.href);
+    const shareId = url.searchParams.get("id");
 
-  if (!data) {
-    document.body.innerHTML = "הנתונים כבר שותפו או שהקישור לא תקין.";
-    return;
-  }
+    if (!shareId) {
+      document.body.innerHTML = "<h3>קישור השיתוף לא תקין.</h3>";
+    }
 
-  const kidData = data.kid; 
-  const kidId = kidData.id || ("kid_" + Date.now());
+    // קריאת נתוני השיתוף
+    db.ref("shared/" + shareId).once("value").then(snapshot => {
+      const data = snapshot.val();
 
-  // 👈 ***כאן*** משתמשים בשורה שדיברנו עליה
-  db.ref("kids/" + currentUserId + "/" + kidId).set(kidData)
-    .then(() => {
-      document.body.innerHTML = "הילד נוסף לכרטיסיות שלך בהצלחה!";
+      if (!data) {
+        document.body.innerHTML = "<h3>קישור זה אינו פעיל יותר.</h3>";
+        return;
+      }
+
+      const kid = data.kid;
+      const kidId = kid.id;
+
+      // יצירת מזהה משתמש למי שפתח את הקישור (אם אין)
+      let currentUserId = localStorage.getItem("userId");
+      if (!currentUserId) {
+        currentUserId = "user_" + Date.now();
+        localStorage.setItem("userId", currentUserId);
+      }
+
+      // שמירה אצל המשתמש שקיבל את השיתוף
+      db.ref("kids/" + currentUserId + "/" + kidId).set(kid)
+        .then(() => {
+          document.body.innerHTML = `
+            <h2>הילד נוסף בהצלחה לחשבון שלך 🎉</h2>
+            <a href="index.html">חזרה לאפליקציה</a>
+          `;
+        });
+
     });
-
-});
-</script>
+  </script>
+</body>
+</html>
