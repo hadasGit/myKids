@@ -196,10 +196,56 @@ function closeModalFn() {
 }
 
 // ====== הוספת ילד ======
+  addKidBtn.addEventListener("click", () => {
+  const name = prompt("שם הילד:");
+  if (!name) return;
+
+  const newKidRef = userKidsRef.push(); // יוצרים מפתח ראשון
+  const kidData = {
+    id: newKidRef.key,    // שומר את המזהה בתוך האובייקט
+    name,
+    activities: []
+  };
+  newKidRef.set(kidData);
+});
+
+//addKidBtn.addEventListener("click", () => {
+ // const name = prompt("שם הילד:");
+  //if (!name) return;
+ // userKidsRef.push({ name, activities: [] });
+//});
+
+// Firebase reference למשתמש הנוכחי
+const currentUserId = localStorage.getItem("currentUserId") || (() => {
+  const id = "user_" + Math.random().toString(36).substr(2, 9);
+  localStorage.setItem("currentUserId", id);
+  return id;
+})();
+
+const userKidsRef = db.ref(`users/${currentUserId}/kids`);
+
+const kidsContainer = document.getElementById("kids-container");
+const addKidBtn = document.getElementById("addKidBtn");
+
+// תאריך נוכחי
+function todayStr() {
+  return new Date().toISOString().slice(0,10);
+}
+const dateFilter = document.getElementById("dateFilter");
+dateFilter.value = todayStr();
+
+// ====== הוספת ילד ======
 addKidBtn.addEventListener("click", () => {
   const name = prompt("שם הילד:");
   if (!name) return;
-  userKidsRef.push({ name, activities: [] });
+
+  const newKidRef = userKidsRef.push();
+  const kidData = {
+    id: newKidRef.key,   // מזהה פנימי
+    name,
+    activities: []
+  };
+  newKidRef.set(kidData);
 });
 
 // ====== טעינת ילדים ======
@@ -207,15 +253,15 @@ userKidsRef.on("value", snapshot => {
   renderKids(snapshot.val());
 });
 
-
+// ====== renderKids ======
 function renderKids(kids) {
   kidsContainer.innerHTML = "";
   if (!kids) return;
 
   const selectedDate = dateFilter.value || todayStr();
 
-  Object.keys(kids).forEach(id => {
-    const kid = kids[id];
+  Object.keys(kids).forEach(kidId => {
+    const kid = kids[kidId];
     const box = document.createElement("div");
     box.className = "kid-box";
 
@@ -226,10 +272,11 @@ function renderKids(kids) {
     nameEl.style.marginBottom = "6px";
     box.appendChild(nameEl);
 
-    // פעילויות של היום
+    // פעילויות היום
     const activities = kid.activities || [];
-    const todaysActivities = activities.filter(a => 
-     !a.isPermanent && (a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === new Date(selectedDate).getDay()))
+    const todaysActivities = activities.filter(a =>
+      !a.isPermanent &&
+      (a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === new Date(selectedDate).getDay()))
     );
 
     const actList = document.createElement("div");
@@ -241,137 +288,106 @@ function renderKids(kids) {
       actList.style.color = "#555";
     } else {
       todaysActivities.forEach(a => {
-  
         const aEl = document.createElement("div");
         aEl.style.display = "flex";
         aEl.style.alignItems = "center";
         aEl.style.justifyContent = "space-between";
-        aEl.style.whiteSpace = "nowrap";
-        aEl.style.width = "100%";
 
-        // טקסט ראשוני של הפעילות
         let text = `${a.time || "--:--"} - ${a.title}`;
-        
-        // אם הפעילות חוזרת שבועית
-        if (a.repeatWeekly) {
-          text += " 🔁"; // מוסיף סמל חוזר
-          aEl.style.color = "#007BFF"; // כחול
-          aEl.style.fontWeight = "bold";
-        }
-        
-        // אם הפעילות היא הסעה
-        if (a.isTransport) {
-          text += " 🚗"; // מוסיף אייקון אוטו
-        }
-        
+        if (a.repeatWeekly) { text += " 🔁"; aEl.style.color = "#007BFF"; aEl.style.fontWeight="bold"; }
+        if (a.isTransport) { text += " 🚗"; }
         aEl.textContent = text;
-        
+
         actList.appendChild(aEl);
-
-
-        
-    
-     });
+      });
     }
-
     box.appendChild(actList);
-    const today = new Date().toISOString().slice(0,10);
-  // ---- הודעות קבועות ----
-const permanentNotes = activities.filter(a => a.isPermanent && a.date >= today);
-if (permanentNotes.length) {
-  const notesContainer = document.createElement("div");
-  notesContainer.style.display = "flex";
-  notesContainer.style.flexWrap = "wrap";
-  notesContainer.style.gap = "4px";
-  notesContainer.style.marginTop = "6px";
 
- permanentNotes.forEach(note => {
-  const noteDiv = document.createElement("div");
-  noteDiv.className = "permanent-note";
+    // הודעות קבועות
+    const today = todayStr();
+    const permanentNotes = activities.filter(a => a.isPermanent && a.date >= today);
+    if (permanentNotes.length) {
+      const notesContainer = document.createElement("div");
+      notesContainer.style.display = "flex";
+      notesContainer.style.flexWrap = "wrap";
+      notesContainer.style.gap = "4px";
+      notesContainer.style.marginTop = "6px";
 
-  const formattedDate = note.date ? note.date.split("-").reverse().join("-") : "";
+      permanentNotes.forEach(note => {
+        const noteDiv = document.createElement("div");
+        noteDiv.className = "permanent-note";
 
-  // span לטקסט המקורי
-  const textSpan = document.createElement("span");
-  textSpan.textContent = `${formattedDate} — ${note.title}`;
-  noteDiv.appendChild(textSpan);
+        const formattedDate = note.date ? note.date.split("-").reverse().join("-") : "";
+        const textSpan = document.createElement("span");
+        textSpan.textContent = `${formattedDate} — ${note.title}`;
+        noteDiv.appendChild(textSpan);
 
-  // כפתור מחיקה קטן
-  const delBtn = document.createElement("span");
-  delBtn.textContent = "×";
-  delBtn.className = "del-btn";
-  delBtn.onclick = e => {
-    e.stopPropagation();
-    if (confirm(`למחוק הודעה קבועה זו?`)) {
-      const updated = activities.filter(a => a.id !== note.id);
-      userKidsRef.child(id).child("activities").set(updated);
+        // כפתור מחיקה
+        const delBtn = document.createElement("span");
+        delBtn.textContent = "×";
+        delBtn.className = "del-btn";
+        delBtn.onclick = e => {
+          e.stopPropagation();
+          if (confirm("למחוק הודעה קבועה זו?")) {
+            const updated = activities.filter(a => a.id !== note.id);
+            userKidsRef.child(kidId).child("activities").set(updated);
+          }
+        };
+        noteDiv.appendChild(delBtn);
+
+        noteDiv.onmouseover = () => delBtn.style.display = "inline-block";
+        noteDiv.onmouseout = () => delBtn.style.display = "none";
+
+        // עריכה inline בלחיצה כפולה
+        noteDiv.ondblclick = e => {
+          e.stopPropagation();
+          textSpan.style.display = "none";
+
+          const inputTitle = document.createElement("input");
+          inputTitle.type = "text"; inputTitle.value = note.title; inputTitle.style.width="60%"; inputTitle.style.fontSize="12px";
+
+          const inputDate = document.createElement("input");
+          inputDate.type = "date"; inputDate.value = note.date; inputDate.style.fontSize="12px";
+
+          const saveBtn = document.createElement("button");
+          saveBtn.textContent = "שמור"; saveBtn.style.fontSize="12px";
+
+          noteDiv.appendChild(inputTitle);
+          noteDiv.appendChild(inputDate);
+          noteDiv.appendChild(saveBtn);
+
+          saveBtn.onclick = ev => {
+            ev.stopPropagation();
+            if (!inputTitle.value.trim() || !inputDate.value) { alert("אנא מלא כותרת ותאריך."); return; }
+
+            const updatedAct = {...note, title: inputTitle.value.trim(), date: inputDate.value };
+            const updated = activities.map(a => a.id === note.id ? updatedAct : a);
+            userKidsRef.child(kidId).child("activities").set(updated);
+          };
+        };
+
+        notesContainer.appendChild(noteDiv);
+      });
+
+      box.appendChild(notesContainer);
     }
-  };
-  noteDiv.appendChild(delBtn);
 
-  // hover effect להצגת כפתור המחיקה
-  noteDiv.onmouseover = () => delBtn.style.display = "inline-block";
-  noteDiv.onmouseout = () => delBtn.style.display = "none";
-
-  // עריכה inline בלחיצה כפולה
-  noteDiv.ondblclick = e => {
-    e.stopPropagation();
-
-    // הסתירו את הטקסט המקורי
-    textSpan.style.display = "none";
-
-    // צור טופס לעריכה
-    const inputTitle = document.createElement("input");
-    inputTitle.type = "text";
-    inputTitle.value = note.title;
-    inputTitle.style.width = "60%";
-    inputTitle.style.fontSize = "12px";
-
-    const inputDate = document.createElement("input");
-    inputDate.type = "date";
-    inputDate.value = note.date;
-    inputDate.style.fontSize = "12px";
-
-    const saveBtn = document.createElement("button");
-    saveBtn.textContent = "שמור";
-    saveBtn.style.fontSize = "12px";
-
-    noteDiv.appendChild(inputTitle);
-    noteDiv.appendChild(inputDate);
-    noteDiv.appendChild(saveBtn);
-
-    saveBtn.onclick = ev => {
-      ev.stopPropagation();
-
-      const newTitle = inputTitle.value.trim();
-      const newDate = inputDate.value;
-
-      if (!newTitle || !newDate) {
-        alert("אנא מלא כותרת ותאריך.");
-        return;
+    // כפתור מחיקה של הילד
+    const delKidBtn = document.createElement("span");
+    delKidBtn.textContent = "×";
+    delKidBtn.className = "delete-kid";
+    delKidBtn.onclick = e => {
+      e.stopPropagation();
+      if (confirm(`למחוק את ${kid.name}?`)) {
+        userKidsRef.child(kidId).remove();
       }
-
-      // עדכון אובייקט ההודעה
-      const updatedAct = { ...note, title: newTitle, date: newDate };
-
-      // עדכון רשימת פעילויות
-      const updated = activities.map(a => a.id === note.id ? updatedAct : a);
-
-      // שמירה ב־Firebase
-      
-      userKidsRef.child(id).child("activities").set(updated)
-        .then(() => {
-          // אחרי שמירה, רנדר מחדש את כל הילדים
-          renderKids(dbData); // dbData = הנתונים מה־Firebase, או טען שוב עם db.ref("kids").once("value")
-        })
-        .catch(err => console.error("Error updating note:", err));
     };
-  };
+    box.appendChild(delKidBtn);
 
-    notesContainer.appendChild(noteDiv);
+    kidsContainer.appendChild(box);
   });
+}
 
-  box.appendChild(notesContainer);
   // כפתור שיתוף
   const shareBtn = document.createElement("button");
   shareBtn.textContent = "שתף";
