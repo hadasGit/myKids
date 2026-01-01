@@ -145,6 +145,7 @@ if (!currentUserId) {
 }
 
 console.log("User ID:", currentUserId);
+const userKidsRef = db.ref(`users/${currentUserId}/kids`);
 
 const kidsContainer = document.getElementById("kids-container");
 const addKidBtn = document.getElementById("addKidBtn");
@@ -179,7 +180,7 @@ function todayStr() {
 dateFilter.value = todayStr();
 
 document.getElementById("refreshBtn").addEventListener("click", () => {
-    db.ref("kids").once("value").then(snapshot => {
+    userKidsRef.once("value").then(snapshot => {
         renderKids(snapshot.val());
       
      // snapshot => {
@@ -198,13 +199,14 @@ function closeModalFn() {
 addKidBtn.addEventListener("click", () => {
   const name = prompt("שם הילד:");
   if (!name) return;
-  db.ref("kids").push({ name, activities: [] });
+  userKidsRef.push({ name, activities: [] });
 });
 
 // ====== טעינת ילדים ======
-db.ref("kids").on("value", snapshot => {
+userKidsRef.on("value", snapshot => {
   renderKids(snapshot.val());
 });
+
 
 function renderKids(kids) {
   kidsContainer.innerHTML = "";
@@ -302,7 +304,7 @@ if (permanentNotes.length) {
     e.stopPropagation();
     if (confirm(`למחוק הודעה קבועה זו?`)) {
       const updated = activities.filter(a => a.id !== note.id);
-      db.ref("kids/" + id + "/activities").set(updated);
+      userKidsRef.child(id).child("activities").set(updated);
     }
   };
   noteDiv.appendChild(delBtn);
@@ -356,7 +358,8 @@ if (permanentNotes.length) {
       const updated = activities.map(a => a.id === note.id ? updatedAct : a);
 
       // שמירה ב־Firebase
-      db.ref("kids/" + id + "/activities").set(updated)
+      
+      userKidsRef.child(id).child("activities").set(updated)
         .then(() => {
           // אחרי שמירה, רנדר מחדש את כל הילדים
           renderKids(dbData); // dbData = הנתונים מה־Firebase, או טען שוב עם db.ref("kids").once("value")
@@ -416,7 +419,7 @@ if (permanentNotes.length) {
     delBtn.onclick = e => {
       e.stopPropagation();
       if (confirm(`למחוק את ${kid.name}?`)) {
-        db.ref("kids/" + id).remove();
+       userKidsRef.child(id).remove();
       }
     };
     box.appendChild(delBtn);
@@ -497,7 +500,7 @@ delBtn.style.borderRadius = "4px";
 delBtn.style.cursor = "pointer";
 delBtn.onclick = () => {
   const updated = activities.filter(act => act.id !== a.id);
-  db.ref("kids/" + kidId + "/activities").set(updated);
+  userKidsRef.child(kidId).child("activities").set(updated);
   openKidModal(kidId, { ...kid, activities: updated });
 };
 
@@ -573,7 +576,7 @@ list.appendChild(item);
       isPermanent: permanentCheckbox.checked,
       isTransport: transportInput.checked
     };
-    db.ref("kids/" + kidId + "/activities").set([...activities, newActivity]);
+    userKidsRef.child(kidId).child("activities").set([...activities, newActivity]);
     openKidModal(kidId, { ...kid, activities: [...activities, newActivity] });
   });
 
@@ -650,7 +653,7 @@ list.appendChild(item);
 
     const updatedList = kid.activities.map(a => a.id === activity.id ? updatedAct : a);
 
-    db.ref("kids/" + kidId + "/activities").set(updatedList);
+    userKidsRef.child(kidId).child("activities").set(updatedList);
     openKidModal(kidId, { ...kid, activities: updatedList });
   });
 
@@ -666,9 +669,11 @@ modalBackdrop.onclick = e => { if (e.target === modalBackdrop) closeModalFn(); }
 // ====== עדכון רשימת פעילויות אוטומטית כשמשנים את התאריך ======
 dateFilter.addEventListener("change", () => {
   if (currentKidId) {
-    db.ref("kids/" + currentKidId).once("value").then(snap => {
+    userKidsRef.child(currentKidId).once("value").then(snap => {
+    if (snap.exists()) {
       openKidModal(currentKidId, snap.val());
-    });
+    }
+  });
   }
 });
 </script>
