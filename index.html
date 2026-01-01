@@ -661,8 +661,8 @@ list.appendChild(item);
 //closeModal.onclick = () => { modalBackdrop.style.display = "none"; currentKidId = null; };
   closeModal.addEventListener("click", closeModalFn);
 
-modalBackdrop.onclick = e => { if (e.target === modalBackdrop) closeModal.onclick(); };
-
+//modalBackdrop.onclick = e => { if (e.target === modalBackdrop) closeModal.onclick(); };
+modalBackdrop.onclick = e => { if (e.target === modalBackdrop) closeModalFn(); };
 // ====== עדכון רשימת פעילויות אוטומטית כשמשנים את התאריך ======
 dateFilter.addEventListener("change", () => {
   if (currentKidId) {
