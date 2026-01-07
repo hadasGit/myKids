@@ -147,10 +147,17 @@ function openKidModal(kidId, kid, activityToEdit = null) {
     const modalContent = document.getElementById("modalContent");
     const modalTitle = document.getElementById("modalTitle");
  
-    modalTitle.innerHTML = `
-        ${activityToEdit ? `עריכת פעילות: ${activityToEdit.title}` : kid.name}
-        ${!activityToEdit ? `<button onclick="shareEntireKid('${kid.name}', ${JSON.stringify(kid.activities || [])})" style="margin-right:10px; background:#10b981; color:white; border:none; border-radius:50%; width:30px; height:30px; cursor:pointer;" title="שתף את כל הלוח של ${kid.name}">🔗</button>` : ''}
-    `;
+   // בתוך openKidModal
+modalTitle.innerHTML = activityToEdit ? `עריכת פעילות: ${activityToEdit.title}` : kid.name;
+
+// הוספת כפתור השיתוף בצורה נקייה (רק אם אנחנו לא במצב עריכה)
+if (!activityToEdit) {
+    const shareBtn = document.createElement("button");
+    shareBtn.innerHTML = "🔗 שתף הכל";
+    shareBtn.style = "margin-right:15px; background:#10b981; color:white; border:none; padding:5px 10px; border-radius:20px; cursor:pointer; font-size:14px;";
+    shareBtn.onclick = () => shareEntireKid(kidId, kid.name); // שולחים רק ID ושם
+    modalTitle.appendChild(shareBtn);
+}
   //  modalTitle.textContent = activityToEdit ? `עריכת פעילות: ${activityToEdit.title}` : kid.name;
     modalContent.innerHTML = "";
     modalBackdrop.style.display = "flex";
@@ -281,24 +288,39 @@ document.getElementById("addKidBtn").onclick = () => {
 };
 
 document.getElementById("closeModal").onclick = () => document.getElementById("modalBackdrop").style.display = "none";
-function shareEntireKid(kidName, activities) {
-    const data = {
-        name: kidName,
-        activities: activities
-    };
-    
-    // קידוד כל הנתונים לקישור
-    const encodedData = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
-    const shareUrl = `${window.location.origin}${window.location.pathname}?sharedKid=${encodedData}`;
+function shareEntireKid(kidId, kidName) {
+    // משיכת הנתונים המעודכנים ביותר מ-Firebase
+    userKidsRef.child(kidId).once("value", snap => {
+        const kidData = snap.val();
+        if (!kidData) return;
 
-    const shareText = `היי, אני משתפת איתך את לוח הפעילויות המלא של ${kidName}. לחץ על הקישור כדי לסנכרן: ${shareUrl}`;
+        const dataToShare = {
+            name: kidData.name,
+            activities: kidData.activities || []
+        };
 
-    if (navigator.share) {
-        navigator.share({ title: `הלוח של ${kidName}`, text: shareText, url: shareUrl });
-    } else {
-        navigator.clipboard.writeText(shareText);
-        alert("הקישור לכל הלוח הועתק! שלחי אותו בוואטסאפ.");
-    }
+        try {
+            // קידוד הנתונים
+            const encodedData = btoa(unescape(encodeURIComponent(JSON.stringify(dataToShare))));
+            const shareUrl = `${window.location.origin}${window.location.pathname}?sharedKid=${encodedData}`;
+
+            const shareText = `שלחתי לך את לוח הפעילויות של ${kidName}:`;
+
+            if (navigator.share) {
+                navigator.share({
+                    title: `הלוח של ${kidName}`,
+                    text: shareText,
+                    url: shareUrl
+                }).catch(err => console.log("שיתוף בוטל"));
+            } else {
+                navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
+                alert("הקישור הועתק ללוח!");
+            }
+        } catch (e) {
+            alert("חלה שגיאה בהכנת הקישור. וודאי שאין תווים מיוחדים מדי.");
+            console.error(e);
+        }
+    });
 }
 // בדיקה האם יש פעילות משותפת בקישור
 window.onload = () => {
