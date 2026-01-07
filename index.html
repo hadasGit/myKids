@@ -146,8 +146,12 @@ function openKidModal(kidId, kid, activityToEdit = null) {
     const modalBackdrop = document.getElementById("modalBackdrop");
     const modalContent = document.getElementById("modalContent");
     const modalTitle = document.getElementById("modalTitle");
-    
-    modalTitle.textContent = activityToEdit ? `עריכת פעילות: ${activityToEdit.title}` : kid.name;
+ 
+    modalTitle.innerHTML = `
+        ${activityToEdit ? `עריכת פעילות: ${activityToEdit.title}` : kid.name}
+        ${!activityToEdit ? `<button onclick="shareEntireKid('${kid.name}', ${JSON.stringify(kid.activities || [])})" style="margin-right:10px; background:#10b981; color:white; border:none; border-radius:50%; width:30px; height:30px; cursor:pointer;" title="שתף את כל הלוח של ${kid.name}">🔗</button>` : ''}
+    `;
+  //  modalTitle.textContent = activityToEdit ? `עריכת פעילות: ${activityToEdit.title}` : kid.name;
     modalContent.innerHTML = "";
     modalBackdrop.style.display = "flex";
 
@@ -277,40 +281,69 @@ document.getElementById("addKidBtn").onclick = () => {
 };
 
 document.getElementById("closeModal").onclick = () => document.getElementById("modalBackdrop").style.display = "none";
+function shareEntireKid(kidName, activities) {
+    const data = {
+        name: kidName,
+        activities: activities
+    };
+    
+    // קידוד כל הנתונים לקישור
+    const encodedData = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+    const shareUrl = `${window.location.origin}${window.location.pathname}?sharedKid=${encodedData}`;
 
+    const shareText = `היי, אני משתפת איתך את לוח הפעילויות המלא של ${kidName}. לחץ על הקישור כדי לסנכרן: ${shareUrl}`;
+
+    if (navigator.share) {
+        navigator.share({ title: `הלוח של ${kidName}`, text: shareText, url: shareUrl });
+    } else {
+        navigator.clipboard.writeText(shareText);
+        alert("הקישור לכל הלוח הועתק! שלחי אותו בוואטסאפ.");
+    }
+}
 // בדיקה האם יש פעילות משותפת בקישור
 window.onload = () => {
     const urlParams = new URLSearchParams(window.location.search);
-    const sharedData = urlParams.get('sharedAct');
+    const sharedKidData = urlParams.get('sharedKid');
 
-    if (sharedData) {
+    if (sharedKidData) {
         try {
-            const activity = JSON.parse(decodeURIComponent(escape(atob(sharedData))));
-            // מניעת כפילות ID
-            activity.id = "a_" + Date.now(); 
+            const incomingKid = JSON.parse(decodeURIComponent(escape(atob(sharedKidData))));
             
-            const kidName = prompt(`קיבלת פעילות: "${activity.title}". לאיזה ילד להוסיף אותה?`);
-            if (kidName) {
-                // חיפוש הילד והוספת הפעילות
+            if (confirm(`האם להוסיף את הלוח של ${incomingKid.name} למערכת שלך?`)) {
                 userKidsRef.once("value", snap => {
-                    const kids = snap.val();
-                    const kidId = Object.keys(kids).find(id => kids[id].name === kidName);
+                    const kids = snap.val() || {};
+                    // בדיקה אם הילד כבר קיים (לפי שם)
+                    let kidId = Object.keys(kids).find(id => kids[id].name === incomingKid.name);
                     
                     if (kidId) {
-                        const updatedActs = [...(kids[kidId].activities || []), activity];
-                        userKidsRef.child(kidId).child("activities").set(updatedActs);
-                        alert("הפעילות נוספה בהצלחה!");
-                        window.history.replaceState({}, document.title, window.location.pathname); // ניקוי ה-URL
+                        // הילד קיים - מוסיפים פעילויות חדשות (מונעים כפילויות לפי כותרת ותאריך)
+                        const existingActs = kids[kidId].activities || [];
+                        const newActs = incomingKid.activities.filter(incoming => 
+                            !existingActs.some(existing => existing.title === incoming.title && existing.date === incoming.date)
+                        );
+                        
+                        userKidsRef.child(kidId).child("activities").set([...existingActs, ...newActs]);
+                        alert(`הפעילויות החדשות התווספו ל${incomingKid.name} הקיים.`);
                     } else {
-                        alert("לא מצאתי ילד בשם הזה.");
+                        // הילד לא קיים - יוצרים קובייה חדשה לגמרי!
+                        const newKidRef = userKidsRef.push();
+                        newKidRef.set({
+                            id: newKidRef.key,
+                            name: incomingKid.name,
+                            activities: incomingKid.activities
+                        });
+                        alert(`נוצרה קובייה חדשה עבור ${incomingKid.name} עם כל הפעילויות.`);
                     }
+                    
+                    // ניקוי הכתובת למעלה
+                    window.history.replaceState({}, document.title, window.location.pathname);
                 });
             }
         } catch (e) {
-            console.error("שגיאה בפענוח השיתוף", e);
+            console.error("שגיאה בסנכרון הילד", e);
         }
     }
-};    
+};
 </script>
 </body>
 </html>
