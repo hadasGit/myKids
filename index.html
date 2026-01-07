@@ -161,13 +161,15 @@ function openKidModal(kidId, kid, activityToEdit = null) {
             item.className = "activity-item";
             const repeatSign = a.repeatWeekly ? ' 🔁' : '';
             const permSign = a.isPermanent ? ' 📌' : '';
-            item.innerHTML = `
-                <span>${a.date.split('-').reverse().join('/')} | ${a.time || '--:--'} ${a.title}${repeatSign}${permSign}</span>
-                <div>
-                    <button class="btn-edit" id="edit-${a.id}">✏️</button>
-                    <button class="btn-delete" onclick="deleteActivity('${kidId}', '${a.id}')">🗑️</button>
-                </div>
-            `;
+           item.innerHTML = `
+            <span>${a.date.split('-').reverse().join('/')} | ${a.time || '--:--'} ${a.title}${repeatSign}${permSign}</span>
+            <div>
+                <button class="btn-share" onclick="shareActivity('${kid.name}', ${JSON.stringify(a).replace(/"/g, '&quot;')})" style="background:#10b981; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">🔗</button>
+                <button class="btn-edit" id="edit-${a.id}">✏️</button>
+                <button class="btn-delete" onclick="deleteActivity('${kidId}', '${a.id}')">🗑️</button>
+            </div>
+        `;
+        
             list.appendChild(item);
             item.querySelector(`#edit-${a.id}`).onclick = () => openKidModal(kidId, kid, a);
         });
@@ -228,6 +230,26 @@ function openKidModal(kidId, kid, activityToEdit = null) {
     };
 }
 
+    function shareActivity(kidName, activity) {
+    // הפיכת פרטי הפעילות לטקסט מוצפן לקישור
+    const activityData = btoa(unescape(encodeURIComponent(JSON.stringify(activity))));
+    const shareUrl = `${window.location.origin}${window.location.pathname}?sharedAct=${activityData}`;
+
+    const shareText = `היי, שלחתי לך פעילות עבור ${kidName}: "${activity.title}" בתאריך ${activity.date}. לחץ כאן להוספה: ${shareUrl}`;
+
+    // שימוש בממשק השיתוף של הטלפון/דפדפן
+    if (navigator.share) {
+        navigator.share({
+            title: 'שיתוף פעילות',
+            text: shareText,
+            url: shareUrl
+        });
+    } else {
+        // גיבוי למחשב - העתקה ללוח
+        navigator.clipboard.writeText(shareText);
+        alert("הקישור הועתק ללוח! שלחי אותו בוואטסאפ.");
+    }
+}
 // --- אירועים ---
 window.deleteActivity = (kidId, actId) => {
     if(!confirm("למחוק פעילות זו?")) return;
@@ -255,6 +277,40 @@ document.getElementById("addKidBtn").onclick = () => {
 };
 
 document.getElementById("closeModal").onclick = () => document.getElementById("modalBackdrop").style.display = "none";
+
+// בדיקה האם יש פעילות משותפת בקישור
+window.onload = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const sharedData = urlParams.get('sharedAct');
+
+    if (sharedData) {
+        try {
+            const activity = JSON.parse(decodeURIComponent(escape(atob(sharedData))));
+            // מניעת כפילות ID
+            activity.id = "a_" + Date.now(); 
+            
+            const kidName = prompt(`קיבלת פעילות: "${activity.title}". לאיזה ילד להוסיף אותה?`);
+            if (kidName) {
+                // חיפוש הילד והוספת הפעילות
+                userKidsRef.once("value", snap => {
+                    const kids = snap.val();
+                    const kidId = Object.keys(kids).find(id => kids[id].name === kidName);
+                    
+                    if (kidId) {
+                        const updatedActs = [...(kids[kidId].activities || []), activity];
+                        userKidsRef.child(kidId).child("activities").set(updatedActs);
+                        alert("הפעילות נוספה בהצלחה!");
+                        window.history.replaceState({}, document.title, window.location.pathname); // ניקוי ה-URL
+                    } else {
+                        alert("לא מצאתי ילד בשם הזה.");
+                    }
+                });
+            }
+        } catch (e) {
+            console.error("שגיאה בפענוח השיתוף", e);
+        }
+    }
+};    
 </script>
 </body>
 </html>
