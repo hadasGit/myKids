@@ -18,16 +18,17 @@
         #addKidBtn { display: block; width: 100%; padding: 15px; margin-top: 20px; font-size: 18px; border: none; background: #4CAF50; color: white; border-radius: 8px; cursor: pointer; }
         #dateFilter { padding: 6px; font-size: 16px; border-radius: 6px; border: 1px solid #ccc; }
         
-        /* Modal Styles */
         #modalBackdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); align-items: center; justify-content: center; z-index: 999; }
         #modal { background: white; border-radius: 12px; max-width: 400px; width: 90%; max-height: 85vh; overflow-y: auto; padding: 20px; position: relative; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
         .close-btn { border: none; background: transparent; font-size: 1.5rem; cursor: pointer; }
         .activity-list { margin-bottom: 20px; }
         .activity-item { border-bottom: 1px solid #eee; padding: 8px 0; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; gap: 5px; }
-        .add-activity-form { display: flex; flex-direction: column; gap: 8px; background: #f9f9f9; padding: 10px; border-radius: 8px; }
-        .add-activity-form input, .add-activity-form select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
-        .permanent-note { background: #ffe5c2; color: #c45d00; padding: 6px 10px; border-radius: 10px; font-size: 13px; margin-top: 6px; position: relative; font-weight: bold; }
+        .add-activity-form { display: flex; flex-direction: column; gap: 8px; background: #f9f9f9; padding: 10px; border-radius: 8px; margin-top:10px; }
+        .add-activity-form input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .permanent-note { background: #ffe5c2; color: #c45d00; padding: 6px 10px; border-radius: 10px; font-size: 13px; margin-top: 6px; font-weight: bold; }
+        .btn-edit { background: #3b82f6; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; }
+        .btn-delete { background: #ef4444; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -36,7 +37,7 @@
 
 <div style="display:flex; align-items:center; gap:8px; justify-content:center;">
     <input type="date" id="dateFilter">
-    <button id="refreshBtn" style="background:#e0e0e0; border:none; padding:8px; border-radius:6px; cursor:pointer;">🔄</button>
+    <button id="refreshBtn" title="סנן לפי תאריך" style="background:#4CAF50; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer;">🔄 סנן פעילויות</button>
 </div>
 
 <button id="addKidBtn">הוסף ילד</button>
@@ -56,6 +57,7 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
 <script>
+
 // --- הגדרות פיירבייס ---
 const firebaseConfig = {
   apiKey: "AIzaSyD9IzSor82cM39XgdLbywBdq-bM8m2c_ak",
@@ -68,38 +70,24 @@ const firebaseConfig = {
   databaseURL:  "https://mykids-3f832-default-rtdb.firebaseio.com"
 };
 
-if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-}
+if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 let currentUserId = localStorage.getItem("currentUserId") || "user_" + Math.random().toString(36).substr(2, 9);
 localStorage.setItem("currentUserId", currentUserId);
-
 const userKidsRef = db.ref(`users/${currentUserId}/kids`);
-const kidsContainer = document.getElementById("kids-container");
-const dateFilter = document.getElementById("dateFilter");
-const modalBackdrop = document.getElementById("modalBackdrop");
-const modalTitle = document.getElementById("modalTitle");
-const modalContent = document.getElementById("modalContent");
 
-function todayStr() {
-    return new Date().toISOString().slice(0, 10);
-}
+const dateFilter = document.getElementById("dateFilter");
+function todayStr() { return new Date().toISOString().slice(0, 10); }
 dateFilter.value = todayStr();
 
-let currentKidId = null;
-
-function closeModalFn() {
-    modalBackdrop.style.display = "none";
-}
-
-// --- רינדור כרטיסיות ילדים ---
+// --- רינדור דף ראשי ---
 function renderKids(kids) {
+    const kidsContainer = document.getElementById("kids-container");
     kidsContainer.innerHTML = "";
     if (!kids) return;
 
-    const selectedDate = dateFilter.value || todayStr();
+    const selectedDate = dateFilter.value; // התאריך שנבחר בתיבת הסינון
     const today = todayStr();
     const selectedDay = new Date(selectedDate).getDay();
 
@@ -112,123 +100,145 @@ function renderKids(kids) {
         const nameEl = document.createElement("div");
         nameEl.textContent = kid.name;
         nameEl.style.fontWeight = "bold";
-        nameEl.style.fontSize = "20px";
         box.appendChild(nameEl);
 
         const activities = kid.activities || [];
 
-        // 1. פעילויות רגילות להיום
+        // סינון פעילויות רגילות לפי התאריך שנבחר בראש הדף
         const todaysActivities = activities.filter(a => 
             !a.isPermanent && (a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === selectedDay))
         );
 
         const actList = document.createElement("div");
         actList.style.marginTop = "10px";
-        if (todaysActivities.length > 0) {
-            todaysActivities.forEach(a => {
-                const aEl = document.createElement("div");
-                aEl.style.fontSize = "14px";
-                aEl.textContent = `${a.time || ""} ${a.title} ${a.isTransport ? '🚗' : ''}`;
-                actList.appendChild(aEl);
-            });
-        }
+        todaysActivities.forEach(a => {
+            const aEl = document.createElement("div");
+            aEl.style.fontSize = "14px";
+            aEl.textContent = `${a.time || ""} ${a.title} ${a.isTransport ? '🚗' : ''}`;
+            actList.appendChild(aEl);
+        });
         box.appendChild(actList);
 
-        // 2. הודעות קבועות - יוצגו רק אם התאריך שלהן לא עבר את היום
+        // הודעות קבועות - מוצגות כל עוד התאריך שלהן לא עבר את "היום"
         const permanentNotes = activities.filter(a => a.isPermanent && a.date >= today);
-        if (permanentNotes.length > 0) {
-            const notesCont = document.createElement("div");
-            notesCont.style.marginTop = "10px";
-            permanentNotes.forEach(note => {
-                const nDiv = document.createElement("div");
-                nDiv.className = "permanent-note";
-                nDiv.textContent = `📌 ${note.title}`;
-                notesCont.appendChild(nDiv);
-            });
-            box.appendChild(notesCont);
-        }
+        permanentNotes.forEach(note => {
+            const nDiv = document.createElement("div");
+            nDiv.className = "permanent-note";
+            nDiv.textContent = `📌 ${note.title}`;
+            box.appendChild(nDiv);
+        });
 
         const delKid = document.createElement("span");
         delKid.className = "delete-kid";
         delKid.innerHTML = "&times;";
-        delKid.onclick = (e) => {
-            e.stopPropagation();
-            if(confirm(`למחוק את ${kid.name}?`)) userKidsRef.child(kidId).remove();
-        };
+        delKid.onclick = (e) => { e.stopPropagation(); if(confirm(`למחוק את ${kid.name}?`)) userKidsRef.child(kidId).remove(); };
         box.appendChild(delKid);
 
         kidsContainer.appendChild(box);
     });
 }
 
-// --- מודל ניהול פעילויות ---
-function openKidModal(kidId, kid) {
-    currentKidId = kidId;
-    modalTitle.textContent = kid.name;
+// --- מודל וניהול פעילויות ---
+function openKidModal(kidId, kid, activityToEdit = null) {
+    const modalBackdrop = document.getElementById("modalBackdrop");
+    const modalContent = document.getElementById("modalContent");
+    const modalTitle = document.getElementById("modalTitle");
+    
+    modalTitle.textContent = activityToEdit ? `עריכת פעילות: ${activityToEdit.title}` : kid.name;
     modalContent.innerHTML = "";
     modalBackdrop.style.display = "flex";
 
     const activities = kid.activities || [];
-    const list = document.createElement("div");
-    list.className = "activity-list";
 
-    // הצגת כל הפעילויות העתידיות של הילד במודל לניהול
-    activities.sort((a,b) => a.date.localeCompare(b.date)).forEach(a => {
-        const item = document.createElement("div");
-        item.className = "activity-item";
-        const dateDisplay = a.date.split('-').reverse().join('/');
-        item.innerHTML = `
-            <span>${dateDisplay} | ${a.isPermanent ? '📌' : a.time} ${a.title}</span>
-            <button style="background:red; color:white; border:none; border-radius:4px; padding:4px;" onclick="deleteActivity('${kidId}', '${a.id}')">מחק</button>
-        `;
-        list.appendChild(item);
-    });
-    modalContent.appendChild(list);
+    // אם לא בעריכה - נציג את רשימת הפעילויות הקיימות
+    if (!activityToEdit) {
+        const list = document.createElement("div");
+        list.className = "activity-list";
+        activities.sort((a,b) => a.date.localeCompare(b.date)).forEach(a => {
+            const item = document.createElement("div");
+            item.className = "activity-item";
+            item.innerHTML = `
+                <span>${a.date.split('-').reverse().join('/')} | ${a.time || '--:--'} ${a.title}</span>
+                <div>
+                    <button class="btn-edit" id="edit-${a.id}">✏️</button>
+                    <button class="btn-delete" onclick="deleteActivity('${kidId}', '${a.id}')">🗑️</button>
+                </div>
+            `;
+            list.appendChild(item);
+            item.querySelector(`#edit-${a.id}`).onclick = () => openKidModal(kidId, kid, a);
+        });
+        modalContent.appendChild(list);
+    }
 
-    // טופס הוספה עם שדה תאריך
+    // טופס הוספה/עריכה
     const form = document.createElement("div");
     form.className = "add-activity-form";
+    
+    // לוגיקה לתאריך: אם זו עריכה - תאריך הפעילות. אם חדש - תאריך של היום.
+    const defaultDate = activityToEdit ? activityToEdit.date : todayStr();
+
     form.innerHTML = `
-        <strong>הוספת פעילות/הודעה:</strong>
-        <input type="date" id="newActDate" value="${dateFilter.value}">
-        <input type="text" id="newActTitle" placeholder="מה עושים? (למשל: יום הולדת)">
-        <input type="time" id="newActTime">
-        <label><input type="checkbox" id="newActPerm"> הודעה קבועה (תוצג עד התאריך)</label>
-        <label><input type="checkbox" id="newActRepeat"> חוזר כל שבוע</label>
-        <label><input type="checkbox" id="newActTrans"> הסעה 🚗</label>
-        <button id="saveActBtn" style="padding:10px; background:#4CAF50; color:white; border:none; border-radius:4px; cursor:pointer;">שמור</button>
+        <label>${activityToEdit ? 'עדכון פעילות:' : 'הוספת פעילות חדשה:'}</label>
+        <input type="date" id="newActDate" value="${defaultDate}">
+        <input type="text" id="newActTitle" placeholder="מה עושים?" value="${activityToEdit ? activityToEdit.title : ''}">
+        <input type="time" id="newActTime" value="${activityToEdit ? activityToEdit.time : ''}">
+        <label><input type="checkbox" id="newActPerm" ${activityToEdit?.isPermanent ? 'checked' : ''}> הודעה קבועה</label>
+        <label><input type="checkbox" id="newActRepeat" ${activityToEdit?.repeatWeekly ? 'checked' : ''}> חוזר כל שבוע</label>
+        <label><input type="checkbox" id="newActTrans" ${activityToEdit?.isTransport ? 'checked' : ''}> הסעה 🚗</label>
+        <button id="saveActBtn" style="padding:10px; background:#4CAF50; color:white; border:none; border-radius:4px; cursor:pointer;">
+            ${activityToEdit ? 'עדכן עכשיו' : 'שמור פעילות'}
+        </button>
+        ${activityToEdit ? '<button id="cancelEdit" style="background:none; border:none; color:blue; cursor:pointer;">ביטול וחזרה</button>' : ''}
     `;
     modalContent.appendChild(form);
+
+    if (activityToEdit) {
+        document.getElementById("cancelEdit").onclick = () => openKidModal(kidId, kid);
+    }
 
     document.getElementById("saveActBtn").onclick = () => {
         const title = document.getElementById("newActTitle").value;
         const date = document.getElementById("newActDate").value;
-        if (!title || !date) { alert("חובה להזין כותרת ותאריך"); return; }
-        
-        const newAct = {
-            id: "a_" + Date.now(),
+        if (!title || !date) return alert("חובה למלא כותרת ותאריך");
+
+        const newActData = {
+            id: activityToEdit ? activityToEdit.id : "a_" + Date.now(),
             title: title,
             date: date,
-            time: document.getElementById("newActTime").value || "",
+            time: document.getElementById("newActTime").value,
             isPermanent: document.getElementById("newActPerm").checked,
             repeatWeekly: document.getElementById("newActRepeat").checked,
             isTransport: document.getElementById("newActTrans").checked
         };
 
-        const updatedActivities = [...activities, newAct];
-        userKidsRef.child(kidId).child("activities").set(updatedActivities);
-        closeModalFn();
+        let updatedList;
+        if (activityToEdit) {
+            updatedList = activities.map(a => a.id === activityToEdit.id ? newActData : a);
+        } else {
+            updatedList = [...activities, newActData];
+        }
+
+        userKidsRef.child(kidId).child("activities").set(updatedList).then(() => {
+            if (activityToEdit) openKidModal(kidId, kid); // חזרה לרשימה אחרי עריכה
+            else document.getElementById("modalBackdrop").style.display = "none";
+        });
     };
 }
 
+// --- אירועים ---
 window.deleteActivity = (kidId, actId) => {
-    if(!confirm("למחוק פעילות זו?")) return;
+    if(!confirm("למחוק?")) return;
     userKidsRef.child(kidId).child("activities").once("value", snap => {
-        const currentActs = snap.val() || [];
-        const filtered = currentActs.filter(a => a.id !== actId);
-        userKidsRef.child(kidId).child("activities").set(filtered);
-        closeModalFn();
+        const filtered = (snap.val() || []).filter(a => a.id !== actId);
+        userKidsRef.child(kidId).child("activities").set(filtered).then(() => {
+            userKidsRef.child(kidId).once("value", s => openKidModal(kidId, s.val()));
+        });
     });
+};
+
+// כפתור הרענון הוא זה שמפעיל את הסינון בדף הראשי
+document.getElementById("refreshBtn").onclick = () => {
+    userKidsRef.once("value", snap => renderKids(snap.val()));
 };
 
 userKidsRef.on("value", snapshot => renderKids(snapshot.val()));
@@ -241,9 +251,7 @@ document.getElementById("addKidBtn").onclick = () => {
     }
 };
 
-document.getElementById("closeModal").onclick = closeModalFn;
-document.getElementById("refreshBtn").onclick = () => location.reload();
-dateFilter.onchange = () => userKidsRef.once("value", snap => renderKids(snap.val()));
+document.getElementById("closeModal").onclick = () => document.getElementById("modalBackdrop").style.display = "none";
 </script>
 </body>
 </html>
