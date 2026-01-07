@@ -57,7 +57,6 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
 <script>
-
 // --- הגדרות פיירבייס ---
 const firebaseConfig = {
   apiKey: "AIzaSyD9IzSor82cM39XgdLbywBdq-bM8m2c_ak",
@@ -69,7 +68,6 @@ const firebaseConfig = {
   measurementId: "G-Q3X18J3SJ4",
   databaseURL:  "https://mykids-3f832-default-rtdb.firebaseio.com"
 };
-
 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
@@ -87,8 +85,7 @@ function renderKids(kids) {
     kidsContainer.innerHTML = "";
     if (!kids) return;
 
-    const selectedDate = dateFilter.value; // התאריך שנבחר בתיבת הסינון
-    const today = todayStr();
+    const selectedDate = dateFilter.value; // התאריך שנבחר בלוח למעלה
     const selectedDay = new Date(selectedDate).getDay();
 
     Object.keys(kids).forEach(kidId => {
@@ -100,11 +97,12 @@ function renderKids(kids) {
         const nameEl = document.createElement("div");
         nameEl.textContent = kid.name;
         nameEl.style.fontWeight = "bold";
+        nameEl.style.fontSize = "22px";
         box.appendChild(nameEl);
 
         const activities = kid.activities || [];
 
-        // סינון פעילויות רגילות לפי התאריך שנבחר בראש הדף
+        // 1. פעילויות רגילות/חוזרות לאותו יום
         const todaysActivities = activities.filter(a => 
             !a.isPermanent && (a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === selectedDay))
         );
@@ -113,14 +111,19 @@ function renderKids(kids) {
         actList.style.marginTop = "10px";
         todaysActivities.forEach(a => {
             const aEl = document.createElement("div");
-            aEl.style.fontSize = "14px";
-            aEl.textContent = `${a.time || ""} ${a.title} ${a.isTransport ? '🚗' : ''}`;
+            aEl.style.fontSize = "15px";
+            aEl.style.margin = "4px 0";
+            
+            const transportIcon = a.isTransport ? ' 🚗' : '';
+            const repeatIcon = a.repeatWeekly ? ' 🔁' : '';
+            
+            aEl.textContent = `${a.time || ""} ${a.title}${transportIcon}${repeatIcon}`;
             actList.appendChild(aEl);
         });
         box.appendChild(actList);
 
-        // הודעות קבועות - מוצגות כל עוד התאריך שלהן לא עבר את "היום"
-        const permanentNotes = activities.filter(a => a.isPermanent && a.date >= today);
+        // 2. הודעות קבועות - סינון מתוקן: מוצגות רק אם תאריך היעד שלהן הוא ביום הנבחר או אחריו
+        const permanentNotes = activities.filter(a => a.isPermanent && a.date >= selectedDate);
         permanentNotes.forEach(note => {
             const nDiv = document.createElement("div");
             nDiv.className = "permanent-note";
@@ -150,15 +153,16 @@ function openKidModal(kidId, kid, activityToEdit = null) {
 
     const activities = kid.activities || [];
 
-    // אם לא בעריכה - נציג את רשימת הפעילויות הקיימות
     if (!activityToEdit) {
         const list = document.createElement("div");
         list.className = "activity-list";
         activities.sort((a,b) => a.date.localeCompare(b.date)).forEach(a => {
             const item = document.createElement("div");
             item.className = "activity-item";
+            const repeatSign = a.repeatWeekly ? ' 🔁' : '';
+            const permSign = a.isPermanent ? ' 📌' : '';
             item.innerHTML = `
-                <span>${a.date.split('-').reverse().join('/')} | ${a.time || '--:--'} ${a.title}</span>
+                <span>${a.date.split('-').reverse().join('/')} | ${a.time || '--:--'} ${a.title}${repeatSign}${permSign}</span>
                 <div>
                     <button class="btn-edit" id="edit-${a.id}">✏️</button>
                     <button class="btn-delete" onclick="deleteActivity('${kidId}', '${a.id}')">🗑️</button>
@@ -170,25 +174,24 @@ function openKidModal(kidId, kid, activityToEdit = null) {
         modalContent.appendChild(list);
     }
 
-    // טופס הוספה/עריכה
     const form = document.createElement("div");
     form.className = "add-activity-form";
     
-    // לוגיקה לתאריך: אם זו עריכה - תאריך הפעילות. אם חדש - תאריך של היום.
+    // תאריך ברירת מחדל: היום (או התאריך המקורי אם עורכים)
     const defaultDate = activityToEdit ? activityToEdit.date : todayStr();
 
     form.innerHTML = `
-        <label>${activityToEdit ? 'עדכון פעילות:' : 'הוספת פעילות חדשה:'}</label>
+        <label><strong>${activityToEdit ? 'עדכון פעילות:' : 'הוספת פעילות חדשה:'}</strong></label>
         <input type="date" id="newActDate" value="${defaultDate}">
         <input type="text" id="newActTitle" placeholder="מה עושים?" value="${activityToEdit ? activityToEdit.title : ''}">
         <input type="time" id="newActTime" value="${activityToEdit ? activityToEdit.time : ''}">
-        <label><input type="checkbox" id="newActPerm" ${activityToEdit?.isPermanent ? 'checked' : ''}> הודעה קבועה</label>
-        <label><input type="checkbox" id="newActRepeat" ${activityToEdit?.repeatWeekly ? 'checked' : ''}> חוזר כל שבוע</label>
+        <label><input type="checkbox" id="newActPerm" ${activityToEdit?.isPermanent ? 'checked' : ''}> הודעה קבועה 📌</label>
+        <label><input type="checkbox" id="newActRepeat" ${activityToEdit?.repeatWeekly ? 'checked' : ''}> חוזר כל שבוע 🔁</label>
         <label><input type="checkbox" id="newActTrans" ${activityToEdit?.isTransport ? 'checked' : ''}> הסעה 🚗</label>
-        <button id="saveActBtn" style="padding:10px; background:#4CAF50; color:white; border:none; border-radius:4px; cursor:pointer;">
+        <button id="saveActBtn" style="padding:10px; background:#4CAF50; color:white; border:none; border-radius:4px; cursor:pointer; margin-top:5px;">
             ${activityToEdit ? 'עדכן עכשיו' : 'שמור פעילות'}
         </button>
-        ${activityToEdit ? '<button id="cancelEdit" style="background:none; border:none; color:blue; cursor:pointer;">ביטול וחזרה</button>' : ''}
+        ${activityToEdit ? '<button id="cancelEdit" style="background:none; border:none; color:blue; cursor:pointer; margin-top:5px;">ביטול וחזרה</button>' : ''}
     `;
     modalContent.appendChild(form);
 
@@ -205,7 +208,7 @@ function openKidModal(kidId, kid, activityToEdit = null) {
             id: activityToEdit ? activityToEdit.id : "a_" + Date.now(),
             title: title,
             date: date,
-            time: document.getElementById("newActTime").value,
+            time: document.getElementById("newActTime").value || "",
             isPermanent: document.getElementById("newActPerm").checked,
             repeatWeekly: document.getElementById("newActRepeat").checked,
             isTransport: document.getElementById("newActTrans").checked
@@ -219,7 +222,7 @@ function openKidModal(kidId, kid, activityToEdit = null) {
         }
 
         userKidsRef.child(kidId).child("activities").set(updatedList).then(() => {
-            if (activityToEdit) openKidModal(kidId, kid); // חזרה לרשימה אחרי עריכה
+            if (activityToEdit) openKidModal(kidId, kid);
             else document.getElementById("modalBackdrop").style.display = "none";
         });
     };
@@ -227,7 +230,7 @@ function openKidModal(kidId, kid, activityToEdit = null) {
 
 // --- אירועים ---
 window.deleteActivity = (kidId, actId) => {
-    if(!confirm("למחוק?")) return;
+    if(!confirm("למחוק פעילות זו?")) return;
     userKidsRef.child(kidId).child("activities").once("value", snap => {
         const filtered = (snap.val() || []).filter(a => a.id !== actId);
         userKidsRef.child(kidId).child("activities").set(filtered).then(() => {
@@ -236,7 +239,7 @@ window.deleteActivity = (kidId, actId) => {
     });
 };
 
-// כפתור הרענון הוא זה שמפעיל את הסינון בדף הראשי
+// כפתור הרענון מפעיל את ה-Render מחדש עם התאריך שנבחר
 document.getElementById("refreshBtn").onclick = () => {
     userKidsRef.once("value", snap => renderKids(snap.val()));
 };
