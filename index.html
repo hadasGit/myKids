@@ -41,7 +41,6 @@
 
 <div id="auth-section">
     <button id="settingsBtn" class="settings-btn" style="display:none;">⚙️</button>
-    
     <div id="user-info">
         <p id="user-status">טוען...</p>
         <button id="loginBtn" class="btn-google" style="display:none;">התחברות עם Google</button>
@@ -54,7 +53,7 @@
     
     <div style="display:flex; align-items:center; gap:8px; justify-content:center; margin-bottom: 20px;">
         <input type="date" id="dateFilter">
-        <button id="refreshBtn" style="background:#4CAF50; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer;">🔄 סנן</button>
+        <button id="refreshBtn" style="background:#4CAF50; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer;">🔄 רענן</button>
     </div>
 
     <div id="family-timeline" style="display:none;">
@@ -74,8 +73,8 @@
         </div>
         <div id="timeline-list"></div>
     </div>
-    <button id="addKidBtn">הוסף חדש</button>
     
+    <button id="addKidBtn">הוסף חדש</button>
     <div id="kids-container"></div>
 </div>
 
@@ -94,6 +93,7 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
 
 <script>
+// --- קונפיגורציה ---
 const firebaseConfig = {
   apiKey: "AIzaSyD9IzSor82cM39XgdLbywBdq-bM8m2c_ak",
   authDomain: "mykids-3f832.firebaseapp.com",
@@ -108,22 +108,12 @@ const firebaseConfig = {
 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const auth = firebase.auth();
-//let userKidsRef = null;
-//let userSettingsRef = null;
-let currentTimelineView = 'daily'; // ברירת מחדל
-// --- ניהול הגדרות ---
-//let appSettings = { title: "הלוח שלי", entityName: "פעילות" };
-// --- משתנים גלובליים וקונפיגורציה ---
-//let currentTimelineView = 'daily'; 
-let currentFilterType = 'all';
-let appSettings = { title: "הלוח שלי", entityName: "פעילות", defaultView: "daily" };
+
 let userKidsRef = null;
 let userSettingsRef = null;
-
-// חיבור ל-Firebase (השתמשי ב-config המקורי שלך כאן)
-if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-const auth = firebase.auth();
+let currentTimelineView = 'daily';
+let currentFilterType = 'all';
+let appSettings = { title: "הלוח שלי", entityName: "פעילות", defaultView: "daily" };
 
 // --- פונקציות עזר ---
 const todayStr = () => new Date().toISOString().slice(0, 10);
@@ -138,7 +128,7 @@ function getNextOccurrence(originalDateStr, targetDateStr) {
     return next.toISOString().slice(0, 10);
 }
 
-// --- ניהול ממשק משתמש (UI) ---
+// --- ניהול ממשק (UI) ---
 function updateUI() {
     document.getElementById("app-title").textContent = appSettings.title;
     document.getElementById("page-title").textContent = appSettings.title;
@@ -147,39 +137,20 @@ function updateUI() {
 }
 
 function updateToggleButtons() {
-    const dailyBtn = document.getElementById("viewDaily");
-    const weeklyBtn = document.getElementById("viewWeekly");
-
-    if (currentTimelineView === 'daily') {
-        dailyBtn.style.background = "#4CAF50"; dailyBtn.style.color = "white";
-        weeklyBtn.style.background = "white"; weeklyBtn.style.color = "#4CAF50";
-    } else {
-        weeklyBtn.style.background = "#4CAF50"; weeklyBtn.style.color = "white";
-        dailyBtn.style.background = "white"; dailyBtn.style.color = "#4CAF50";
-    }
+    document.getElementById("viewDaily").classList.toggle('active', currentTimelineView === 'daily');
+    document.getElementById("viewWeekly").classList.toggle('active', currentTimelineView === 'weekly');
 }
 
 function refreshData() {
     if (userKidsRef) userKidsRef.once("value", s => renderKids(s.val()));
 }
 
-// --- מאזינים לאירועים (Events) ---
-document.getElementById("viewDaily").onclick = () => { 
-    currentTimelineView = 'daily'; 
-    refreshData(); 
-};
-
-document.getElementById("viewWeekly").onclick = () => { 
-    currentTimelineView = 'weekly'; 
-    refreshData(); 
-};
-
-if(document.getElementById("typeFilter")) {
-    document.getElementById("typeFilter").onchange = (e) => { 
-        currentFilterType = e.target.value; 
-        refreshData(); 
-    };
-}
+// --- אירועי כפתורים ---
+document.getElementById("viewDaily").onclick = () => { currentTimelineView = 'daily'; refreshData(); };
+document.getElementById("viewWeekly").onclick = () => { currentTimelineView = 'weekly'; refreshData(); };
+document.getElementById("typeFilter").onchange = (e) => { currentFilterType = e.target.value; refreshData(); };
+document.getElementById("refreshBtn").onclick = () => refreshData();
+document.getElementById("closeModal").onclick = () => document.getElementById("modalBackdrop").style.display = "none";
 
 document.getElementById("settingsBtn").onclick = () => {
     const newTitle = prompt("שם האפליקציה:", appSettings.title);
@@ -187,19 +158,22 @@ document.getElementById("settingsBtn").onclick = () => {
     const defaultView = confirm("האם תרצי שהלו\"ז ייפתח תמיד במצב שבועי? (ביטול = יומי)") ? 'weekly' : 'daily';
     
     if (newTitle && newEntity) {
-        userSettingsRef.update({ 
-            title: newTitle, 
-            entityName: newEntity,
-            defaultView: defaultView 
-        });
+        userSettingsRef.update({ title: newTitle, entityName: newEntity, defaultView: defaultView });
     }
 };
 
 document.getElementById("loginBtn").onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
 document.getElementById("logoutBtn").onclick = () => auth.signOut();
-document.getElementById("refreshBtn").onclick = () => refreshData();
 
-// --- ניהול משתמש והתחברות ---
+document.getElementById("addKidBtn").onclick = () => {
+    const name = prompt(`שם ה${appSettings.entityName}:`);
+    if (name && userKidsRef) {
+        const ref = userKidsRef.push();
+        ref.set({ id: ref.key, name, activities: [] });
+    }
+};
+
+// --- ניהול משתמש ---
 auth.onAuthStateChanged(user => {
     if (user) {
         document.getElementById("user-status").textContent = `שלום, ${user.displayName}`;
@@ -212,7 +186,6 @@ auth.onAuthStateChanged(user => {
         userSettingsRef.on("value", snap => {
             if (snap.exists()) {
                 appSettings = snap.val();
-                // אם זו טעינה ראשונה, הגדר את התצוגה לפי ברירת המחדל שנשמרה
                 if (!window.initialLoadDone) {
                     currentTimelineView = appSettings.defaultView || 'daily';
                     window.initialLoadDone = true;
@@ -242,10 +215,7 @@ function renderKids(kids) {
     timelineList.innerHTML = "";
     updateToggleButtons();
 
-    if (!kids) {
-        timelineContainer.style.display = "none";
-        return;
-    }
+    if (!kids) { timelineContainer.style.display = "none"; return; }
 
     const selectedDate = document.getElementById("dateFilter").value;
     const baseDate = new Date(selectedDate);
@@ -255,11 +225,9 @@ function renderKids(kids) {
         const kid = kids[kidId];
         const activities = kid.activities || [];
         
-        // 1. איסוף פעילויות ללו"ז המשותף
+        // 1. איסוף ללו"ז משפחתי
         activities.forEach(a => {
             if (a.isPermanent) return;
-
-            // סינון לפי סוג (הסעות)
             if (currentFilterType === 'transport' && !a.isTransport) return;
             if (currentFilterType === 'regular' && a.isTransport) return;
 
@@ -278,7 +246,7 @@ function renderKids(kids) {
             }
         });
 
-        // 2. יצירת הקוביה של הילד
+        // 2. קובית ילד
         const box = document.createElement("div");
         box.className = "kid-box";
         box.onclick = () => openKidModal(kidId, kid);
@@ -316,7 +284,7 @@ function renderKids(kids) {
         container.appendChild(box);
     });
 
-    // 3. רינדור הלו"ז המשותף
+    // 3. הצגת הלו"ז המשותף
     if (allActivities.length > 0) {
         timelineContainer.style.display = "block";
         allActivities.sort((a, b) => a.displayDate.localeCompare(b.displayDate) || (a.time || "99:99").localeCompare(b.time || "99:99"));
@@ -324,28 +292,24 @@ function renderKids(kids) {
         let lastHeader = "";
         allActivities.forEach(act => {
             if (currentTimelineView === 'weekly' && act.displayDate !== lastHeader) {
-                const dateHeader = document.createElement("div");
-                dateHeader.style = "background:#eee; padding:2px 8px; font-size:12px; font-weight:bold; margin-top:10px; border-radius:4px;";
-                dateHeader.textContent = act.displayDate.split('-').reverse().join('/');
-                timelineList.appendChild(dateHeader);
+                const header = document.createElement("div");
+                header.style = "background:#eee; padding:2px 8px; font-size:12px; font-weight:bold; margin-top:10px; border-radius:4px;";
+                header.textContent = act.displayDate.split('-').reverse().join('/');
+                timelineList.appendChild(header);
                 lastHeader = act.displayDate;
             }
-
             const item = document.createElement("div");
             item.className = "timeline-item";
-            item.innerHTML = `
-                <span class="timeline-time">${act.time || "--:--"}</span>
-                <span class="timeline-content">
-                    <span class="timeline-kid-name">${act.kidName}</span>
-                    ${act.title} ${act.isTransport ? '🚗' : ''}
-                </span>`;
+            item.innerHTML = `<span class="timeline-time">${act.time || "--:--"}</span>
+                <span class="timeline-content"><span class="timeline-kid-name">${act.kidName}</span> ${act.title} ${act.isTransport ? '🚗' : ''}</span>`;
             timelineList.appendChild(item);
         });
     } else {
         timelineContainer.style.display = "none";
     }
 }
-// --- ניהול המודל (חלון פעילויות) ---
+
+// --- ניהול מודל ---
 function openKidModal(kidId, kid, activityToEdit = null) {
     const modalContent = document.getElementById("modalContent");
     const modalTitle = document.getElementById("modalTitle");
@@ -393,7 +357,6 @@ function openKidModal(kidId, kid, activityToEdit = null) {
         <label><input type="checkbox" id="newActRepeat" ${activityToEdit?.repeatWeekly ? 'checked' : ''}> חוזר שבועי 🔁</label>
         <label><input type="checkbox" id="newActTrans" ${activityToEdit?.isTransport ? 'checked' : ''}> הסעה 🚗</label>
         <button id="saveActBtn" style="padding:10px; background:#4CAF50; color:white; border:none; border-radius:4px; cursor:pointer;">שמור</button>
-        ${activityToEdit ? '<button onclick="openKidModal(\''+kidId+'\', JSON.parse(\''+JSON.stringify(kid).replace(/'/g, "\\'")+'\'))">ביטול</button>' : ''}
     `;
     modalContent.appendChild(form);
 
@@ -413,13 +376,22 @@ function openKidModal(kidId, kid, activityToEdit = null) {
 
         const newList = activityToEdit ? activities.map(a => a.id === activityToEdit.id ? newAct : a) : [...activities, newAct];
         userKidsRef.child(kidId).child("activities").set(newList).then(() => {
-            if (activityToEdit) userKidsRef.child(kidId).once("value", s => openKidModal(kidId, s.val()));
-            else document.getElementById("modalBackdrop").style.display = "none";
+            userKidsRef.child(kidId).once("value", s => openKidModal(kidId, s.val()));
         });
     };
 }
 
-// --- שיתוף ---
+// --- שיתוף ומחיקה ---
+window.deleteActivity = (kidId, actId) => {
+    if(!confirm("למחוק?")) return;
+    userKidsRef.child(kidId).child("activities").once("value", snap => {
+        const filtered = (snap.val() || []).filter(a => a.id !== actId);
+        userKidsRef.child(kidId).child("activities").set(filtered).then(() => {
+            userKidsRef.child(kidId).once("value", s => openKidModal(kidId, s.val()));
+        });
+    });
+};
+
 function shareActivity(kidName, a) {
     const data = btoa(unescape(encodeURIComponent(JSON.stringify(a))));
     const url = `${window.location.origin}${window.location.pathname}?sharedAct=${data}`;
@@ -436,51 +408,8 @@ function shareEntireKid(kidId, kidName) {
         else { navigator.clipboard.writeText(url); alert("קישור הועתק!"); }
     });
 }
-function renderTimeline(activities, listEl, containerEl) {
-    if (activities.length === 0) { containerEl.style.display = "none"; return; }
-    containerEl.style.display = "block";
-    updateToggleButtons();
 
-    activities.sort((a, b) => a.displayDate.localeCompare(b.displayDate) || (a.time || "99:99").localeCompare(b.time || "99:99"));
-    
-    let lastHeader = "";
-    activities.forEach(act => {
-        if (currentTimelineView === 'weekly' && act.displayDate !== lastHeader) {
-            const header = document.createElement("div");
-            header.style = "background:#f9f9f9; padding:4px; font-weight:bold; border-bottom:1px solid #ddd; margin-top:10px;";
-            header.textContent = act.displayDate.split('-').reverse().join('/');
-            listEl.appendChild(header);
-            lastHeader = act.displayDate;
-        }
-        const item = document.createElement("div");
-        item.className = "timeline-item";
-        item.innerHTML = `<span class="timeline-time">${act.time || "--:--"}</span>
-                          <span class="timeline-content"><span class="timeline-kid-name">${act.kidName}</span> ${act.title} ${act.isTransport ? '🚗' : ''}</span>`;
-        listEl.appendChild(item);
-    });
-}
-window.deleteActivity = (kidId, actId) => {
-    if(!confirm("למחוק?")) return;
-    userKidsRef.child(kidId).child("activities").once("value", snap => {
-        const filtered = (snap.val() || []).filter(a => a.id !== actId);
-        userKidsRef.child(kidId).child("activities").set(filtered).then(() => {
-            userKidsRef.child(kidId).once("value", s => openKidModal(kidId, s.val()));
-        });
-    });
-};
-
-document.getElementById("addKidBtn").onclick = () => {
-    const name = prompt(`שם ה${appSettings.entityName}:`);
-    if (name && userKidsRef) {
-        const ref = userKidsRef.push();
-        ref.set({ id: ref.key, name, activities: [] });
-    }
-};
-
-document.getElementById("closeModal").onclick = () => document.getElementById("modalBackdrop").style.display = "none";
-document.getElementById("refreshBtn").onclick = () => userKidsRef.once("value", snap => renderKids(snap.val()));
-
-// --- קליטת שיתוף ---
+// --- קליטת שיתוף בטעינה ---
 window.addEventListener('load', () => {
     const params = new URLSearchParams(window.location.search);
     const sk = params.get('sharedKid');
@@ -488,7 +417,7 @@ window.addEventListener('load', () => {
 
     if (sk || sa) {
         auth.onAuthStateChanged(user => {
-            if (!user) return alert("אנא התחברי קודם.");
+            if (!user) return;
             if (sk) {
                 const data = JSON.parse(decodeURIComponent(escape(atob(sk))));
                 if (confirm(`להוסיף את ${data.name}?`)) {
