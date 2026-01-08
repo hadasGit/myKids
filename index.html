@@ -33,6 +33,8 @@
         .btn-google { background: #4285F4; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
         .btn-edit { background: #3b82f6; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; }
         .btn-delete { background: #ef4444; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; }
+        .btn-toggle { padding: 5px 12px; cursor: pointer; border: 1px solid #4CAF50; background: white; color: #4CAF50; transition: 0.3s; }
+        .btn-toggle.active { background: #4CAF50; color: white; }
     </style>
 </head>
 <body>
@@ -56,16 +58,22 @@
     </div>
 
     <div id="family-timeline" style="display:none;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
             <h3 style="margin:0;">📅 לו"ז משפחתי</h3>
+            
             <div class="view-selector">
-                <button id="viewDaily" style="padding: 5px 10px; cursor: pointer; border-radius: 4px 0 0 4px; border: 1px solid #4CAF50; background: #4CAF50; color: white;">יומי</button>
-                <button id="viewWeekly" style="padding: 5px 10px; cursor: pointer; border-radius: 0 4px 4px 0; border: 1px solid #4CAF50; background: white; color: #4CAF50;">שבועי</button>
+                <button id="viewDaily" class="btn-toggle">יומי</button>
+                <button id="viewWeekly" class="btn-toggle">שבועי</button>
             </div>
+    
+            <select id="typeFilter" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc;">
+                <option value="all">הכל</option>
+                <option value="transport">רק הסעות 🚗</option>
+                <option value="regular">ללא הסעות</option>
+            </select>
         </div>
         <div id="timeline-list"></div>
     </div>
-
     <button id="addKidBtn">הוסף חדש</button>
     
     <div id="kids-container"></div>
@@ -100,74 +108,25 @@ const firebaseConfig = {
 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const auth = firebase.auth();
-let userKidsRef = null;
-let userSettingsRef = null;
+//let userKidsRef = null;
+//let userSettingsRef = null;
 let currentTimelineView = 'daily'; // ברירת מחדל
 // --- ניהול הגדרות ---
-let appSettings = { title: "הלוח שלי", entityName: "פעילות" };
+//let appSettings = { title: "הלוח שלי", entityName: "פעילות" };
+// --- משתנים גלובליים וקונפיגורציה ---
+//let currentTimelineView = 'daily'; 
+let currentFilterType = 'all';
+let appSettings = { title: "הלוח שלי", entityName: "פעילות", defaultView: "daily" };
+let userKidsRef = null;
+let userSettingsRef = null;
 
-function updateUI() {
-    const titleEl = document.getElementById("app-title");
-    const pageTitleEl = document.getElementById("page-title");
-    const addBtnEl = document.getElementById("addKidBtn");
+// חיבור ל-Firebase (השתמשי ב-config המקורי שלך כאן)
+if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const auth = firebase.auth();
 
-    if (titleEl) titleEl.textContent = appSettings.title;
-    if (pageTitleEl) pageTitleEl.textContent = appSettings.title;
-    if (addBtnEl) addBtnEl.textContent = `הוספת ${appSettings.entityName}`;
-}
-
-document.getElementById("settingsBtn").onclick = () => {
-    const newTitle = prompt("שם האפליקציה (למשל: הלוח של משפחת ישראלי):", appSettings.title);
-    const newEntity = prompt("שם הפריט להוספה (למשל: ילד / פעילות):", appSettings.entityName);
-    if (newTitle && newEntity) {
-        userSettingsRef.set({ title: newTitle, entityName: newEntity });
-    }
-};
-
-// --- ניהול משתמש והתחברות ---
-auth.onAuthStateChanged(user => {
-    if (user) {
-        document.getElementById("user-status").textContent = `שלום, ${user.displayName}`;
-        document.getElementById("loginBtn").style.display = "none";
-        document.getElementById("logoutBtn").style.display = "inline-block";
-        document.getElementById("settingsBtn").style.display = "block";
-        document.getElementById("main-content").style.display = "block";
-        
-        // טעינת הגדרות אישיות מה-DB
-        userSettingsRef = db.ref(`users/${user.uid}/settings`);
-        userSettingsRef.on("value", snap => {
-            if (snap.exists()) {
-                appSettings = snap.val();
-                updateUI();
-            }
-        });
-
-        // טעינת מידע על הפעילויות
-        userKidsRef = db.ref(`users/${user.uid}/kids`);
-        userKidsRef.on("value", snapshot => {
-            try {
-                renderKids(snapshot.val());
-            } catch (e) {
-                console.error("Render Error:", e);
-            }
-        });
-    } else {
-        document.getElementById("user-status").textContent = "אנא התחברי כדי לצפות בנתונים";
-        document.getElementById("loginBtn").style.display = "inline-block";
-        document.getElementById("logoutBtn").style.display = "none";
-        document.getElementById("settingsBtn").style.display = "none";
-        document.getElementById("main-content").style.display = "none";
-        userKidsRef = null;
-    }
-});
-
-document.getElementById("loginBtn").onclick = () => {
-    auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
-};
-document.getElementById("logoutBtn").onclick = () => auth.signOut();
-
-// --- פונקציות עזר וחישובים ---
-function todayStr() { return new Date().toISOString().slice(0, 10); }
+// --- פונקציות עזר ---
+const todayStr = () => new Date().toISOString().slice(0, 10);
 document.getElementById("dateFilter").value = todayStr();
 
 function getNextOccurrence(originalDateStr, targetDateStr) {
@@ -178,21 +137,102 @@ function getNextOccurrence(originalDateStr, targetDateStr) {
     while (next < target) { next.setDate(next.getDate() + 7); }
     return next.toISOString().slice(0, 10);
 }
-// הוספת מאזינים לכפתורי התצוגה 
-document.getElementById("viewDaily").onclick = () => {
-    currentTimelineView = 'daily';
-    document.getElementById("viewDaily").style.background = "#4CAF50"; document.getElementById("viewDaily").style.color = "white";
-    document.getElementById("viewWeekly").style.background = "white"; document.getElementById("viewWeekly").style.color = "#4CAF50";
-    userKidsRef.once("value", s => renderKids(s.val()));
+
+// --- ניהול ממשק משתמש (UI) ---
+function updateUI() {
+    document.getElementById("app-title").textContent = appSettings.title;
+    document.getElementById("page-title").textContent = appSettings.title;
+    document.getElementById("addKidBtn").textContent = `הוספת ${appSettings.entityName}`;
+    updateToggleButtons();
+}
+
+function updateToggleButtons() {
+    const dailyBtn = document.getElementById("viewDaily");
+    const weeklyBtn = document.getElementById("viewWeekly");
+
+    if (currentTimelineView === 'daily') {
+        dailyBtn.style.background = "#4CAF50"; dailyBtn.style.color = "white";
+        weeklyBtn.style.background = "white"; weeklyBtn.style.color = "#4CAF50";
+    } else {
+        weeklyBtn.style.background = "#4CAF50"; weeklyBtn.style.color = "white";
+        dailyBtn.style.background = "white"; dailyBtn.style.color = "#4CAF50";
+    }
+}
+
+function refreshData() {
+    if (userKidsRef) userKidsRef.once("value", s => renderKids(s.val()));
+}
+
+// --- מאזינים לאירועים (Events) ---
+document.getElementById("viewDaily").onclick = () => { 
+    currentTimelineView = 'daily'; 
+    refreshData(); 
 };
 
-document.getElementById("viewWeekly").onclick = () => {
-    currentTimelineView = 'weekly';
-    document.getElementById("viewWeekly").style.background = "#4CAF50"; document.getElementById("viewWeekly").style.color = "white";
-    document.getElementById("viewDaily").style.background = "white"; document.getElementById("viewDaily").style.color = "#4CAF50";
-    userKidsRef.once("value", s => renderKids(s.val()));
+document.getElementById("viewWeekly").onclick = () => { 
+    currentTimelineView = 'weekly'; 
+    refreshData(); 
 };
-// --- רינדור המסך ---
+
+if(document.getElementById("typeFilter")) {
+    document.getElementById("typeFilter").onchange = (e) => { 
+        currentFilterType = e.target.value; 
+        refreshData(); 
+    };
+}
+
+document.getElementById("settingsBtn").onclick = () => {
+    const newTitle = prompt("שם האפליקציה:", appSettings.title);
+    const newEntity = prompt("שם הפריט (ילד/פעילות):", appSettings.entityName);
+    const defaultView = confirm("האם תרצי שהלו\"ז ייפתח תמיד במצב שבועי? (ביטול = יומי)") ? 'weekly' : 'daily';
+    
+    if (newTitle && newEntity) {
+        userSettingsRef.update({ 
+            title: newTitle, 
+            entityName: newEntity,
+            defaultView: defaultView 
+        });
+    }
+};
+
+document.getElementById("loginBtn").onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+document.getElementById("logoutBtn").onclick = () => auth.signOut();
+document.getElementById("refreshBtn").onclick = () => refreshData();
+
+// --- ניהול משתמש והתחברות ---
+auth.onAuthStateChanged(user => {
+    if (user) {
+        document.getElementById("user-status").textContent = `שלום, ${user.displayName}`;
+        document.getElementById("loginBtn").style.display = "none";
+        document.getElementById("logoutBtn").style.display = "inline-block";
+        document.getElementById("settingsBtn").style.display = "block";
+        document.getElementById("main-content").style.display = "block";
+        
+        userSettingsRef = db.ref(`users/${user.uid}/settings`);
+        userSettingsRef.on("value", snap => {
+            if (snap.exists()) {
+                appSettings = snap.val();
+                // אם זו טעינה ראשונה, הגדר את התצוגה לפי ברירת המחדל שנשמרה
+                if (!window.initialLoadDone) {
+                    currentTimelineView = appSettings.defaultView || 'daily';
+                    window.initialLoadDone = true;
+                }
+                updateUI();
+            }
+        });
+
+        userKidsRef = db.ref(`users/${user.uid}/kids`);
+        userKidsRef.on("value", snapshot => renderKids(snapshot.val()));
+    } else {
+        document.getElementById("user-status").textContent = "אנא התחברי לצפייה בנתונים";
+        document.getElementById("loginBtn").style.display = "inline-block";
+        document.getElementById("logoutBtn").style.display = "none";
+        document.getElementById("main-content").style.display = "none";
+        userKidsRef = null;
+    }
+});
+
+// --- פונקציית הרינדור המרכזית ---
 function renderKids(kids) {
     const container = document.getElementById("kids-container");
     const timelineList = document.getElementById("timeline-list");
@@ -200,7 +240,8 @@ function renderKids(kids) {
     
     container.innerHTML = "";
     timelineList.innerHTML = "";
-    
+    updateToggleButtons();
+
     if (!kids) {
         timelineContainer.style.display = "none";
         return;
@@ -210,37 +251,34 @@ function renderKids(kids) {
     const baseDate = new Date(selectedDate);
     let allActivities = [];
 
-    // --- לוגיקה חדשה: איסוף פעילויות ללו"ז המשפחתי ---
     Object.keys(kids).forEach(kidId => {
         const kid = kids[kidId];
         const activities = kid.activities || [];
         
+        // 1. איסוף פעילויות ללו"ז המשותף
         activities.forEach(a => {
-            if (a.isPermanent) return; // לא מציגים פתקים בלו"ז המשפחתי
+            if (a.isPermanent) return;
+
+            // סינון לפי סוג (הסעות)
+            if (currentFilterType === 'transport' && !a.isTransport) return;
+            if (currentFilterType === 'regular' && a.isTransport) return;
 
             if (currentTimelineView === 'daily') {
-                // לוגיקה יומית (מה שהיה לך)
                 const isMatch = a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === baseDate.getDay());
-                if (isMatch) {
-                    allActivities.push({ ...a, kidName: kid.name, displayDate: selectedDate });
-                }
+                if (isMatch) allActivities.push({ ...a, kidName: kid.name, displayDate: selectedDate });
             } else {
-                // לוגיקה שבועית: בודקים 7 ימים קדימה מהתאריך שנבחר
                 for (let i = 0; i < 7; i++) {
                     let tempDate = new Date(baseDate);
                     tempDate.setDate(baseDate.getDate() + i);
                     let tempDateStr = tempDate.toISOString().slice(0, 10);
-                    let tempDay = tempDate.getDay();
-
-                    const isMatch = a.date === tempDateStr || (a.repeatWeekly && new Date(a.date).getDay() === tempDay);
-                    if (isMatch) {
+                    if (a.date === tempDateStr || (a.repeatWeekly && new Date(a.date).getDay() === tempDate.getDay())) {
                         allActivities.push({ ...a, kidName: kid.name, displayDate: tempDateStr });
                     }
                 }
             }
         });
 
-        // --- יצירת הקוביה של הילד (ללא שינוי) ---
+        // 2. יצירת הקוביה של הילד
         const box = document.createElement("div");
         box.className = "kid-box";
         box.onclick = () => openKidModal(kidId, kid);
@@ -251,14 +289,12 @@ function renderKids(kids) {
         box.appendChild(nameEl);
 
         const actList = document.createElement("div");
-        actList.style.marginTop = "10px";
-
         activities.forEach(a => {
             const isMatch = !a.isPermanent && (a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === baseDate.getDay()));
             if (isMatch) {
                 const aEl = document.createElement("div");
                 aEl.style.fontSize = "15px";
-                aEl.textContent = `${a.time || ""} ${a.title}${a.isTransport ? ' 🚗' : ''}${a.repeatWeekly ? ' 🔁' : ''}`;
+                aEl.textContent = `${a.time || ""} ${a.title}${a.isTransport ? ' 🚗' : ''}`;
                 actList.appendChild(aEl);
             }
         });
@@ -280,16 +316,13 @@ function renderKids(kids) {
         container.appendChild(box);
     });
 
-    // --- הצגת הלו"ז המשפחתי הממוין (מעודכן לתמיכה בשבוע) ---
+    // 3. רינדור הלו"ז המשותף
     if (allActivities.length > 0) {
         timelineContainer.style.display = "block";
-        
-        // מיון קודם לפי תאריך ואז לפי שעה
-        allActivities.sort((a, b) => a.displayDate.localeCompare(b.displayDate) || a.time.localeCompare(b.time));
+        allActivities.sort((a, b) => a.displayDate.localeCompare(b.displayDate) || (a.time || "99:99").localeCompare(b.time || "99:99"));
 
         let lastHeader = "";
         allActivities.forEach(act => {
-            // אם אנחנו בתצוגה שבועית, נוסיף כותרת תאריך כשמתחלף יום
             if (currentTimelineView === 'weekly' && act.displayDate !== lastHeader) {
                 const dateHeader = document.createElement("div");
                 dateHeader.style = "background:#eee; padding:2px 8px; font-size:12px; font-weight:bold; margin-top:10px; border-radius:4px;";
@@ -300,9 +333,8 @@ function renderKids(kids) {
 
             const item = document.createElement("div");
             item.className = "timeline-item";
-            const displayTime = act.time === "99:99" ? "--:--" : act.time;
             item.innerHTML = `
-                <span class="timeline-time">${displayTime}</span>
+                <span class="timeline-time">${act.time || "--:--"}</span>
                 <span class="timeline-content">
                     <span class="timeline-kid-name">${act.kidName}</span>
                     ${act.title} ${act.isTransport ? '🚗' : ''}
@@ -404,7 +436,29 @@ function shareEntireKid(kidId, kidName) {
         else { navigator.clipboard.writeText(url); alert("קישור הועתק!"); }
     });
 }
+function renderTimeline(activities, listEl, containerEl) {
+    if (activities.length === 0) { containerEl.style.display = "none"; return; }
+    containerEl.style.display = "block";
+    updateToggleButtons();
 
+    activities.sort((a, b) => a.displayDate.localeCompare(b.displayDate) || (a.time || "99:99").localeCompare(b.time || "99:99"));
+    
+    let lastHeader = "";
+    activities.forEach(act => {
+        if (currentTimelineView === 'weekly' && act.displayDate !== lastHeader) {
+            const header = document.createElement("div");
+            header.style = "background:#f9f9f9; padding:4px; font-weight:bold; border-bottom:1px solid #ddd; margin-top:10px;";
+            header.textContent = act.displayDate.split('-').reverse().join('/');
+            listEl.appendChild(header);
+            lastHeader = act.displayDate;
+        }
+        const item = document.createElement("div");
+        item.className = "timeline-item";
+        item.innerHTML = `<span class="timeline-time">${act.time || "--:--"}</span>
+                          <span class="timeline-content"><span class="timeline-kid-name">${act.kidName}</span> ${act.title} ${act.isTransport ? '🚗' : ''}</span>`;
+        listEl.appendChild(item);
+    });
+}
 window.deleteActivity = (kidId, actId) => {
     if(!confirm("למחוק?")) return;
     userKidsRef.child(kidId).child("activities").once("value", snap => {
