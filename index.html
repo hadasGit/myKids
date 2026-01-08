@@ -24,6 +24,29 @@
         .btn-google { background: #4285F4; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
         .btn-edit { background: #3b82f6; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; }
         .btn-delete { background: #ef4444; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; }
+        #family-timeline { 
+            background: #fff; 
+            padding: 15px; 
+            border-radius: 12px; 
+            margin-bottom: 20px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border-right: 5px solid #4CAF50;
+        }
+        .timeline-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px dashed #eee;
+        }
+        .timeline-time { font-weight: bold; width: 60px; color: #4CAF50; }
+        .timeline-content { flex-grow: 1; }
+        .timeline-kid-name { 
+            font-size: 0.8rem; 
+            background: #e2e8f0; 
+            padding: 2px 6px; 
+            border-radius: 4px; 
+            margin-left: 8px; 
+        }
    </style>
 </head>
 <body>
@@ -42,6 +65,10 @@
         <button id="refreshBtn" style="background:#4CAF50; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer;">🔄 סנן</button>
     </div>
     <button id="addKidBtn">הוסף ילד חדש</button>
+    <div id="family-timeline" style="display:none;">
+        <h3 style="margin-top:0;">📅 לו"ז משפחתי להיום:</h3>
+        <div id="timeline-list"></div>
+    </div>
     <div id="kids-container"></div>
 </div>
 
@@ -116,12 +143,63 @@ document.getElementById("logoutBtn").onclick = () => auth.signOut();
 // --- רינדור ---
 function renderKids(kids) {
     const container = document.getElementById("kids-container");
+    const timelineList = document.getElementById("timeline-list");
+    const timelineContainer = document.getElementById("family-timeline");
+    
     container.innerHTML = "";
-    if (!kids) return;
+    timelineList.innerHTML = "";
+    
+    if (!kids) {
+        timelineContainer.style.display = "none";
+        return;
+    }
 
     const selectedDate = document.getElementById("dateFilter").value;
     const selectedDay = new Date(selectedDate).getDay();
+    
+    // --- יצירת הלו"ז המשפחתי ---
+    let allDailyActivities = [];
 
+    Object.keys(kids).forEach(kidId => {
+        const kid = kids[kidId];
+        const activities = kid.activities || [];
+        
+        activities.forEach(a => {
+            const isMatch = !a.isPermanent && (a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === selectedDay));
+            if (isMatch) {
+                allDailyActivities.push({
+                    time: a.time || "99:99", // למיון אלו בלי שעה לסוף
+                    title: a.title,
+                    kidName: kid.name,
+                    isTransport: a.isTransport
+                });
+            }
+        });
+    });
+
+    // מיון לפי שעה
+    allDailyActivities.sort((a, b) => a.time.localeCompare(b.time));
+
+    if (allDailyActivities.length > 0) {
+        timelineContainer.style.display = "block";
+        allDailyActivities.forEach(act => {
+            const item = document.createElement("div");
+            item.className = "timeline-item";
+            const displayTime = act.time === "99:99" ? "--:--" : act.time;
+            item.innerHTML = `
+                <span class="timeline-time">${displayTime}</span>
+                <span class="timeline-content">
+                    <span class="timeline-kid-name">${act.kidName}</span>
+                    ${act.title} ${act.isTransport ? '🚗' : ''}
+                </span>
+            `;
+            timelineList.appendChild(item);
+        });
+    } else {
+        timelineContainer.style.display = "none";
+    }
+
+ 
     Object.keys(kids).forEach(kidId => {
         const kid = kids[kidId];
         const box = document.createElement("div");
