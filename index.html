@@ -240,41 +240,62 @@ function renderKids(kids) {
         const activities = kid.activities || [];
         
         activities.forEach(a => {
+            // --- לוגיקת הסינון המעודכנת ---
+            // אם בחרנו "רק הסעות" והפעילות היא לא הסעה - דלג
             if (currentFilterType === 'transport' && !a.isTransport) return;
+            
+            // אם בחרנו "ללא הסעות" והפעילות היא הסעה - דלג
             if (currentFilterType === 'regular' && a.isTransport) return;
 
+            // פונקציה פנימית לבדיקת התאמה לתאריך (כולל קבועים וחוזרים)
             const checkMatch = (dStr) => {
                 const d = new Date(dStr);
-                return a.date === dStr || 
-                       (a.repeatWeekly && new Date(a.date).getDay() === d.getDay()) || 
-                       (a.isPermanent && a.date <= dStr);
+                const isSameDate = a.date === dStr;
+                const isRecurring = a.repeatWeekly && new Date(a.date).getDay() === d.getDay();
+                const isPermanent = a.isPermanent && a.date <= dStr;
+                
+                return isSameDate || isRecurring || isPermanent;
             };
 
             if (currentTimelineView === 'daily') {
-                if (checkMatch(selectedDate)) allActivities.push({ ...a, kidName: kid.name, displayDate: selectedDate });
+                if (checkMatch(selectedDate)) {
+                    allActivities.push({ ...a, kidName: kid.name, displayDate: selectedDate });
+                }
             } else {
+                // תצוגה שבועית - עוברים על 7 ימים
                 for (let i = 0; i < 7; i++) {
-                    let t = new Date(baseDate); t.setDate(baseDate.getDate() + i);
+                    let t = new Date(baseDate);
+                    t.setDate(baseDate.getDate() + i);
                     let ts = t.toISOString().slice(0, 10);
-                    if (checkMatch(ts)) allActivities.push({ ...a, kidName: kid.name, displayDate: ts });
+                    if (checkMatch(ts)) {
+                        allActivities.push({ ...a, kidName: kid.name, displayDate: ts });
+                    }
                 }
             }
         });
 
-        // קובית ילד
+        // --- רינדור קוביות הילדים (נשאר דומה עם תיקון קל) ---
         const box = document.createElement("div");
         box.className = "kid-box";
         box.onclick = () => openKidModal(kidId, kid);
-        box.innerHTML = `<strong>${kid.name}</strong><div style="font-size:14px"></div>`;
-        const actList = box.querySelector("div");
+        box.innerHTML = `<strong>${kid.name}</strong><div class="act-list-mini" style="font-size:14px; margin-top:8px;"></div>`;
+        const miniList = box.querySelector(".act-list-mini");
+
         activities.forEach(a => {
-            if (a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === baseDate.getDay())) {
-                actList.innerHTML += `<div>${a.time || ""} ${a.title}${a.isTransport ? ' 🚗' : ''}</div>`;
+            // בקוביות הילדים נציג רק את מה שרלוונטי להיום (או ליום שנבחר בסנן)
+            const isMatch = a.date === selectedDate || 
+                           (a.repeatWeekly && new Date(a.date).getDay() === baseDate.getDay());
+            
+            if (!a.isPermanent && isMatch) {
+                miniList.innerHTML += `<div>${a.time || ""} ${a.title}${a.isTransport ? ' 🚗' : ''}</div>`;
             }
         });
+
+        // הצגת פתקים קבועים בקובית הילד
         activities.filter(a => a.isPermanent && a.date <= selectedDate).forEach(note => {
             box.innerHTML += `<div class="permanent-note">📌 ${note.title}</div>`;
         });
+
         const del = document.createElement("span");
         del.className = "delete-kid"; del.innerHTML = "&times;";
         del.onclick = (e) => { e.stopPropagation(); if(confirm(`למחוק?`)) userKidsRef.child(kidId).remove(); };
@@ -282,9 +303,12 @@ function renderKids(kids) {
         container.appendChild(box);
     });
 
+    // --- רינדור הלו"ז המרוכז ---
     if (allActivities.length > 0) {
         timelineContainer.style.display = "block";
+        // מיון לפי תאריך ואז לפי שעה
         allActivities.sort((a, b) => a.displayDate.localeCompare(b.displayDate) || (a.time || "99:99").localeCompare(b.time || "99:99"));
+        
         let lastH = "";
         allActivities.forEach(act => {
             if (currentTimelineView === 'weekly' && act.displayDate !== lastH) {
@@ -295,13 +319,18 @@ function renderKids(kids) {
             }
             const item = document.createElement("div");
             item.className = "timeline-item";
-            item.innerHTML = `<span class="timeline-time">${act.time || "--:--"}</span>
-                <span class="timeline-content"><span class="timeline-kid-name">${act.kidName}</span> ${act.isPermanent ? '📌 ' : ''}${act.title} ${act.isTransport ? '🚗' : ''}</span>`;
+            item.innerHTML = `
+                <span class="timeline-time">${act.time || "--:--"}</span>
+                <span class="timeline-content">
+                    <span class="timeline-kid-name">${act.kidName}</span> 
+                    ${act.isPermanent ? '📌 ' : ''}${act.title} ${act.isTransport ? '🚗' : ''} ${act.repeatWeekly ? '🔁' : ''}
+                </span>`;
             timelineList.appendChild(item);
         });
-    } else { timelineContainer.style.display = "none"; }
+    } else { 
+        timelineContainer.style.display = "none"; 
+    }
 }
-
 function openKidModal(kidId, kid, activityToEdit = null) {
     const modalContent = document.getElementById("modalContent");
     const modalTitle = document.getElementById("modalTitle");
