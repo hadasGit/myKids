@@ -186,6 +186,9 @@ function openKidModal(kidId, kid, activityToEdit = null) {
         activities.sort((a,b) => a.date.localeCompare(b.date)).forEach(a => {
             const item = document.createElement("div");
             item.className = "activity-item";
+           
+            const repeatSign = a.repeatWeekly ? ' 🔁' : '';
+            const permSign = a.isPermanent ? ' 📌' : '';
             
             let displayDate = a.date;
             if (a.repeatWeekly) displayDate = getNextOccurrence(a.date, todayStr());
