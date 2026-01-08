@@ -414,8 +414,7 @@ function openKidModal(kidId, kid, activityToEdit = null) {
             userKidsRef.child(kidId).once("value", s => openKidModal(kidId, s.val()));
         });
     };
-    קוד יצירת הפורם (נשאר כפי שהיה)
-    renderActivityForm(kidId, kid, activityToEdit, modalContent);
+        renderActivityForm(kidId, kid, activityToEdit, modalContent);
 }
 
 
