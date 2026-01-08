@@ -176,7 +176,7 @@ function openKidModal(kidId, kid, activityToEdit = null) {
 
     if (!activityToEdit) {
         const shareBtn = document.createElement("button");
-        shareBtn.innerHTML = = "🔗 שתף את כל הלוח של " + kid.name;
+        shareBtn.innerHTML =  "🔗 שתף את כל הלוח של " + kid.name;
         shareBtn.style = "margin-bottom:15px; background:#10b981; color:white; border:none; padding:10px; border-radius:8px; cursor:pointer; width:100%; font-weight:bold;";
         shareBtn.onclick = () => shareEntireKid(kidId, kid.name);
         modalContent.appendChild(shareBtn);
