@@ -132,121 +132,8 @@ let appSettings = { title: "הלוח שלי", entityName: "פעילות", defaul
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 document.getElementById("dateFilter").value = todayStr();
-// --- מערכת שיתוף וייבוא נתונים (Deep Linking) ---
 
-// 1. יצירת קישור שיתוף
-function shareActivity(kidName, act) {
-    const shareData = { type: 'single', kidName, activity: act };
-    const encodedData = btoa(unescape(encodeURIComponent(JSON.stringify(shareData))));
-    const shareUrl = `${window.location.origin}${window.location.pathname}?share=${encodedData}`;
-    
-    const msg = `היי, אני משתף איתך פעילות עבור ${kidName}: *${act.title}*\nניתן להוסיף אותה ללוח שלך בלחיצה כאן:\n${shareUrl}`;
-    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
-}
-
-function shareEntireKid(kidId, kidName) {
-    userKidsRef.child(kidId).once("value", snap => {
-        const kid = snap.val();
-        const shareData = { type: 'kid', kidName: kid.name, activities: kid.activities || [] };
-        const encodedData = btoa(unescape(encodeURIComponent(JSON.stringify(shareData))));
-        const shareUrl = `${window.location.origin}${window.location.pathname}?share=${encodedData}`;
-        
-        const msg = `היי, אני משתף איתך את כל הלוח של *${kid.name}*!\nלהוספה ללוח שלך לחצי כאן:\n${shareUrl}`;
-        window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
-    });
-}
-
-// 2. בדיקת ייבוא בטעינת הדף
-function checkIncomingShare() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const sharedDataRaw = urlParams.get('share');
-    
-    if (sharedDataRaw && auth.currentUser) {
-        try {
-            const decodedData = JSON.parse(decodeURIComponent(escape(atob(sharedDataRaw))));
-            
-            if (decodedData.type === 'kid') {
-                if (confirm(`האם תרצי להוסיף את "${decodedData.kidName}" והפעילויות שלו ללוח שלך?`)) {
-                    const newRef = userKidsRef.push();
-                    newRef.set({ id: newRef.key, name: decodedData.kidName, activities: decodedData.activities });
-                    alert("הילד נוסף בהצלחה!");
-                }
-            } else if (decodedData.type === 'single') {
-                userKidsRef.once("value", snap => {
-                    const kids = snap.val();
-                    if (!kids) return alert("עליך להוסיף ילד קודם");
-                    
-                    const kidNames = Object.values(kids).map(k => k.name);
-                    const targetKid = prompt(`לאיזה ילד להוסיף את הפעילות "${decodedData.activity.title}"?\nאפשרויות: ${kidNames.join(", ")}`);
-                    
-                    const kidEntry = Object.entries(kids).find(([id, k]) => k.name === targetKid);
-                    if (kidEntry) {
-                        const [id, kid] = kidEntry;
-                        const newList = [...(kid.activities || []), { ...decodedData.activity, id: "a_" + Date.now() }];
-                        userKidsRef.child(id).child("activities").set(newList);
-                        alert("הפעילות נוספה!");
-                    }
-                });
-            }
-            // ניקוי ה-URL אחרי הייבוא
-            window.history.replaceState({}, document.title, window.location.pathname);
-        } catch (e) { console.error("Share error", e); }
-    }
-}
-
-function updateUI() {
-    document.getElementById("app-title").textContent = appSettings.title;
-    document.getElementById("page-title").textContent = appSettings.title;
-    document.getElementById("addKidBtn").textContent = `הוספת ${appSettings.entityName}`;
-    updateToggleButtons();
-}
-
-function updateToggleButtons() {
-    document.getElementById("viewDaily").classList.toggle('active', currentTimelineView === 'daily');
-    document.getElementById("viewWeekly").classList.toggle('active', currentTimelineView === 'weekly');
-}
-
-function refreshData() {
-    if (userKidsRef) userKidsRef.once("value", s => renderKids(s.val()));
-}
-
-// --- אירועי כפתורים ---
-document.getElementById("viewDaily").onclick = () => { currentTimelineView = 'daily'; refreshData(); };
-document.getElementById("viewWeekly").onclick = () => { currentTimelineView = 'weekly'; refreshData(); };
-document.getElementById("typeFilter").onchange = (e) => { currentFilterType = e.target.value; refreshData(); };
-document.getElementById("refreshBtn").onclick = () => refreshData();
-document.getElementById("closeModal").onclick = () => document.getElementById("modalBackdrop").style.display = "none";
-document.getElementById("closeSettings").onclick = () => document.getElementById("settingsModalBackdrop").style.display = "none";
-
-document.getElementById("settingsBtn").onclick = () => {
-    document.getElementById("setAppTitle").value = appSettings.title;
-    document.getElementById("setEntityName").value = appSettings.entityName;
-    document.getElementById("setWeeklyDefault").checked = appSettings.defaultView === 'weekly';
-    document.getElementById("settingsModalBackdrop").style.display = "flex";
-};
-
-document.getElementById("saveSettingsBtn").onclick = () => {
-    const title = document.getElementById("setAppTitle").value;
-    const entity = document.getElementById("setEntityName").value;
-    const isWeekly = document.getElementById("setWeeklyDefault").checked;
-    if (title && entity) {
-        userSettingsRef.update({ title, entityName: entity, defaultView: isWeekly ? 'weekly' : 'daily' });
-        document.getElementById("settingsModalBackdrop").style.display = "none";
-    }
-};
-
-document.getElementById("loginBtn").onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
-document.getElementById("logoutBtn").onclick = () => auth.signOut();
-
-document.getElementById("addKidBtn").onclick = () => {
-    const name = prompt(`שם ה${appSettings.entityName}:`);
-    if (name && userKidsRef) {
-        const ref = userKidsRef.push();
-        ref.set({ id: ref.key, name, activities: [] });
-    }
-};
-
-// --- ניהול משתמש ---
+// --- ניהול משתמש וטעינה ---
 auth.onAuthStateChanged(user => {
     if (user) {
         document.getElementById("user-status").textContent = `שלום, ${user.displayName}`;
@@ -278,6 +165,15 @@ auth.onAuthStateChanged(user => {
     }
 });
 
+function updateUI() {
+    document.getElementById("app-title").textContent = appSettings.title;
+    document.getElementById("page-title").textContent = appSettings.title;
+    document.getElementById("addKidBtn").textContent = `הוספת ${appSettings.entityName}`;
+    document.getElementById("viewDaily").classList.toggle('active', currentTimelineView === 'daily');
+    document.getElementById("viewWeekly").classList.toggle('active', currentTimelineView === 'weekly');
+}
+
+// --- רינדור קוביות ולו"ז ---
 function renderKids(kids) {
     const container = document.getElementById("kids-container");
     const timelineList = document.getElementById("timeline-list");
@@ -309,7 +205,7 @@ function renderKids(kids) {
         activities.forEach(a => {
             const isMatch = a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === baseDate.getDay());
             
-            // הצגת פעילויות רגילות בקוביה
+            // 1. הצגת פעילויות בקוביה (לפי תאריך)
             if (!a.isPermanent && isMatch) {
                 const aEl = document.createElement("div");
                 aEl.style.fontSize = "16px";
@@ -317,7 +213,7 @@ function renderKids(kids) {
                 actList.appendChild(aEl);
             }
             
-            // הודעה קבועה (📌) - תופיע תמיד בקוביה (ללא קשר לתאריך)
+            // 2. הודעה קבועה - תופיע תמיד בקוביה
             if (a.isPermanent) {
                 const nDiv = document.createElement("div");
                 nDiv.className = "permanent-note";
@@ -325,7 +221,7 @@ function renderKids(kids) {
                 actList.appendChild(nDiv);
             }
 
-            // --- לוגיקת לו"ז משפחתי ---
+            // 3. איסוף ללו"ז המשפחתי (עם סינון תאריך להודעות קבועות)
             if (currentFilterType === 'transport' && !a.isTransport) return;
             if (currentFilterType === 'permanent' && !a.isPermanent) return;
             if (currentFilterType === 'recurring' && !a.repeatWeekly) return;
@@ -333,8 +229,7 @@ function renderKids(kids) {
 
             const checkTimelineMatch = (dStr) => {
                 const d = new Date(dStr);
-                // בלו"ז: הודעה קבועה תופיע רק בתאריך שלה
-                if (a.isPermanent) return a.date === dStr;
+                if (a.isPermanent) return a.date === dStr; // בלו"ז רק בתאריך המקורי
                 return a.date === dStr || (a.repeatWeekly && new Date(a.date).getDay() === d.getDay());
             };
 
@@ -350,11 +245,9 @@ function renderKids(kids) {
         });
 
         box.appendChild(actList);
-
         const del = document.createElement("span");
-        del.className = "delete-kid";
-        del.innerHTML = "&times;";
-        del.onclick = (e) => { e.stopPropagation(); if(confirm(`למחוק?`)) userKidsRef.child(kidId).remove(); };
+        del.className = "delete-kid"; del.innerHTML = "&times;";
+        del.onclick = (e) => { e.stopPropagation(); if(confirm(`למחוק את ${kid.name}?`)) userKidsRef.child(kidId).remove(); };
         box.appendChild(del);
         container.appendChild(box);
     });
@@ -366,35 +259,44 @@ function renderTimelineList(allActivities, timelineList, timelineContainer) {
     if (allActivities.length > 0) {
         timelineContainer.style.display = "block";
         allActivities.sort((a, b) => a.displayDate.localeCompare(b.displayDate) || (a.time || "99:99").localeCompare(b.time || "99:99"));
-
         let lastHeader = "";
         allActivities.forEach(act => {
             if (currentTimelineView === 'weekly' && act.displayDate !== lastHeader) {
-                const header = document.createElement("div");
-                header.style = "background:#eee; padding:4px 8px; font-size:12px; font-weight:bold; margin-top:10px; border-radius:4px; border-right: 3px solid #4CAF50;";
-                header.textContent = act.displayDate.split('-').reverse().join('/');
-                timelineList.appendChild(header);
-                lastHeader = act.displayDate;
+                const h = document.createElement("div");
+                h.style = "background:#eee; padding:4px 8px; font-size:12px; font-weight:bold; margin-top:10px; border-radius:4px; border-right: 3px solid #4CAF50;";
+                h.textContent = act.displayDate.split('-').reverse().join('/');
+                timelineList.appendChild(h); lastHeader = act.displayDate;
             }
             const item = document.createElement("div");
             item.className = "timeline-item";
-            item.innerHTML = `
-                <span class="timeline-time">${act.time || "--:--"}</span>
-                <span class="timeline-content">
-                    <span class="timeline-kid-name">${act.kidName}</span> 
-                    ${act.isPermanent ? '📌 ' : ''}${act.title} ${act.isTransport ? '🚗' : ''} ${act.repeatWeekly ? '🔁' : ''}
-                </span>`;
+            item.innerHTML = `<span class="timeline-time">${act.time || "--:--"}</span><span class="timeline-content"><span class="timeline-kid-name">${act.kidName}</span> ${act.isPermanent ? '📌 ' : ''}${act.title} ${act.isTransport ? '🚗' : ''} ${act.repeatWeekly ? '🔁' : ''}</span>`;
             timelineList.appendChild(item);
         });
-    } else {
-        timelineContainer.style.display = "none";
-    }
+    } else { timelineContainer.style.display = "none"; }
 }
 
+// --- שיתוף (הפונקציות המקוריות שביקשת) ---
+function shareActivity(kidName, a) {
+    const data = btoa(unescape(encodeURIComponent(JSON.stringify(a))));
+    const url = `${window.location.origin}${window.location.pathname}?sharedAct=${data}`;
+    const txt = `פעילות עבור ${kidName}: ${a.title}. להוספה: ${url}`;
+    if (navigator.share) navigator.share({ title: 'שיתוף', text: txt, url: url });
+    else { navigator.clipboard.writeText(txt); alert("הועתק ללוח!"); }
+}
+
+function shareEntireKid(kidId, kidName) {
+    userKidsRef.child(kidId).once("value", snap => {
+        const data = btoa(unescape(encodeURIComponent(JSON.stringify(snap.val()))));
+        const url = `${window.location.origin}${window.location.pathname}?sharedKid=${data}`;
+        if (navigator.share) navigator.share({ title: kidName, url: url });
+        else { navigator.clipboard.writeText(url); alert("קישור הועתק!"); }
+    });
+}
+
+// --- מודל ועריכה ---
 function openKidModal(kidId, kid, activityToEdit = null) {
     const modalContent = document.getElementById("modalContent");
-    const modalTitle = document.getElementById("modalTitle");
-    modalTitle.innerHTML = activityToEdit ? `עריכה` : kid.name;
+    document.getElementById("modalTitle").innerHTML = activityToEdit ? `עריכה` : kid.name;
     modalContent.innerHTML = "";
     document.getElementById("modalBackdrop").style.display = "flex";
     const activities = kid.activities || [];
@@ -412,8 +314,7 @@ function openKidModal(kidId, kid, activityToEdit = null) {
             item.className = "activity-item";
             const dateFmt = a.date.split('-').reverse().join('/');
             const icons = `${a.isPermanent ? '📌' : ''}${a.isTransport ? '🚗' : ''}${a.repeatWeekly ? '🔁' : ''}`;
-            item.innerHTML = `
-                <span style="font-size:14px;">${dateFmt} | ${a.time || '--:--'} ${a.title} ${icons}</span>
+            item.innerHTML = `<span>${dateFmt} | ${a.time || '--:--'} ${a.title} ${icons}</span>
                 <div style="display:flex; gap:5px;">
                     <button onclick="event.stopPropagation(); shareActivity('${kid.name}', ${JSON.stringify(a).replace(/"/g, '&quot;')})" style="background:#10b981; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">🔗</button>
                     <button class="btn-edit" onclick="event.stopPropagation(); openKidModal('${kidId}', ${JSON.stringify(kid).replace(/"/g, '&quot;')}, ${JSON.stringify(a).replace(/"/g, '&quot;')})">✏️</button>
@@ -426,28 +327,27 @@ function openKidModal(kidId, kid, activityToEdit = null) {
 
     const form = document.createElement("div");
     form.className = "add-activity-form";
-    const defDate = activityToEdit ? activityToEdit.date : todayStr();
+    const dDate = activityToEdit ? activityToEdit.date : todayStr();
     form.innerHTML = `
-        <input type="date" id="newActDate" value="${defDate}">
+        <input type="date" id="newActDate" value="${dDate}">
         <input type="text" id="newActTitle" placeholder="מה עושים?" value="${activityToEdit ? activityToEdit.title : ''}">
         <input type="time" id="newActTime" value="${activityToEdit ? activityToEdit.time : ''}">
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 5px; font-size:13px; margin-top:5px;">
-            <label><input type="checkbox" id="newActPerm" ${activityToEdit?.isPermanent ? 'checked' : ''}> קבוע 📌</label>
-            <label><input type="checkbox" id="newActRepeat" ${activityToEdit?.repeatWeekly ? 'checked' : ''}> חוזר 🔁</label>
-            <label><input type="checkbox" id="newActTrans" ${activityToEdit?.isTransport ? 'checked' : ''}> הסעה 🚗</label>
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; font-size:12px; margin-top:5px;">
+            <label><input type="checkbox" id="newActPerm" ${activityToEdit?.isPermanent ? 'checked' : ''}> קבוע</label>
+            <label><input type="checkbox" id="newActRepeat" ${activityToEdit?.repeatWeekly ? 'checked' : ''}> חוזר</label>
+            <label><input type="checkbox" id="newActTrans" ${activityToEdit?.isTransport ? 'checked' : ''}> הסעה</label>
         </div>
-        <button id="saveActBtn" style="margin-top:10px; padding:10px; background:#4CAF50; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">שמור</button>
+        <button id="saveActBtn" style="margin-top:10px; padding:10px; background:#4CAF50; color:white; border:none; border-radius:6px; cursor:pointer;">שמור</button>
     `;
     modalContent.appendChild(form);
 
     document.getElementById("saveActBtn").onclick = () => {
         const title = document.getElementById("newActTitle").value;
         const date = document.getElementById("newActDate").value;
-        if (!title || !date) return alert("חובה למלא שם ותאריך");
+        if (!title || !date) return alert("חובה למלא הכל");
         const newAct = {
             id: activityToEdit ? activityToEdit.id : "a_" + Date.now(),
-            title, date,
-            time: document.getElementById("newActTime").value || "",
+            title, date, time: document.getElementById("newActTime").value || "",
             isPermanent: document.getElementById("newActPerm").checked,
             repeatWeekly: document.getElementById("newActRepeat").checked,
             isTransport: document.getElementById("newActTrans").checked
@@ -459,6 +359,38 @@ function openKidModal(kidId, kid, activityToEdit = null) {
     };
 }
 
+// --- אירועים נוספים וקליטת שיתוף ---
+window.addEventListener('load', () => {
+    const params = new URLSearchParams(window.location.search);
+    const sk = params.get('sharedKid');
+    const sa = params.get('sharedAct');
+
+    if (sk || sa) {
+        auth.onAuthStateChanged(user => {
+            if (!user) return alert("אנא התחברי קודם.");
+            if (sk) {
+                const data = JSON.parse(decodeURIComponent(escape(atob(sk))));
+                if (confirm(`להוסיף את ${data.name}?`)) {
+                    const newRef = userKidsRef.push();
+                    newRef.set({...data, id: newRef.key});
+                }
+            }
+            if (sa) {
+                const act = JSON.parse(decodeURIComponent(escape(atob(sa))));
+                const kName = prompt(`להוסיף "${act.title}" למי?`);
+                if (kName) {
+                    userKidsRef.once("value", snap => {
+                        const kids = snap.val() || {};
+                        let kId = Object.keys(kids).find(id => kids[id].name === kName);
+                        if (kId) userKidsRef.child(kId).child("activities").set([...(kids[kId].activities || []), {...act, id: "a_"+Date.now()}]);
+                    });
+                }
+            }
+            window.history.replaceState({}, '', window.location.pathname);
+        });
+    }
+});
+
 window.deleteActivity = (kidId, actId) => {
     if(!confirm("למחוק?")) return;
     userKidsRef.child(kidId).child("activities").once("value", snap => {
@@ -467,6 +399,22 @@ window.deleteActivity = (kidId, actId) => {
             userKidsRef.child(kidId).once("value", s => openKidModal(kidId, s.val()));
         });
     });
+};
+
+document.getElementById("viewDaily").onclick = () => { currentTimelineView = 'daily'; updateUI(); userKidsRef.once("value", s => renderKids(s.val())); };
+document.getElementById("viewWeekly").onclick = () => { currentTimelineView = 'weekly'; updateUI(); userKidsRef.once("value", s => renderKids(s.val())); };
+document.getElementById("typeFilter").onchange = (e) => { currentFilterType = e.target.value; userKidsRef.once("value", s => renderKids(s.val())); };
+document.getElementById("refreshBtn").onclick = () => userKidsRef.once("value", snap => renderKids(snap.val()));
+document.getElementById("closeModal").onclick = () => document.getElementById("modalBackdrop").style.display = "none";
+document.getElementById("loginBtn").onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+document.getElementById("logoutBtn").onclick = () => auth.signOut();
+
+document.getElementById("addKidBtn").onclick = () => {
+    const name = prompt(`שם ה${appSettings.entityName}:`);
+    if (name && userKidsRef) {
+        const ref = userKidsRef.push();
+        ref.set({ id: ref.key, name, activities: [] });
+    }
 };
 
 document.getElementById("whatsappShareBtn").onclick = () => {
@@ -480,5 +428,3 @@ document.getElementById("whatsappShareBtn").onclick = () => {
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
 };
 </script>
-</body>
-</html>
