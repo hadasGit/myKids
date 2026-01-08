@@ -76,16 +76,17 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
 
 <script>
-// *** זכרי להדביק את הקונפיג שלך כאן ***
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT.firebaseapp.com",
-    databaseURL: "https://YOUR_PROJECT.firebaseio.com",
-    projectId: "YOUR_PROJECT",
-    storageBucket: "YOUR_PROJECT.appspot.com",
-    messagingSenderId: "YOUR_ID",
-    appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyD9IzSor82cM39XgdLbywBdq-bM8m2c_ak",
+  authDomain: "mykids-3f832.firebaseapp.com",
+  projectId: "mykids-3f832",
+  storageBucket: "mykids-3f832.firebasestorage.app",
+  messagingSenderId: "869870400492",
+  appId: "1:869870400492:web:80200b8102afb53e1c06c9",
+  measurementId: "G-Q3X18J3SJ4",
+  databaseURL:  "https://mykids-3f832-default-rtdb.firebaseio.com"
 };
+
 
 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
