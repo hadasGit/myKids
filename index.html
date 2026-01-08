@@ -132,27 +132,66 @@ let appSettings = { title: "הלוח שלי", entityName: "פעילות", defaul
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 document.getElementById("dateFilter").value = todayStr();
+// --- מערכת שיתוף וייבוא נתונים (Deep Linking) ---
 
-// --- פונקציות עזר לשיתוף (היו חסרות ולכן החלון לא עבד) ---
+// 1. יצירת קישור שיתוף
 function shareActivity(kidName, act) {
-    const dateFmt = act.date.split('-').reverse().join('/');
-    const msg = `*לו"ז עבור ${kidName}*\n📅 תאריך: ${dateFmt}\n⏰ שעה: ${act.time || '--:--'}\n📝 פעילות: ${act.title}`;
+    const shareData = { type: 'single', kidName, activity: act };
+    const encodedData = btoa(unescape(encodeURIComponent(JSON.stringify(shareData))));
+    const shareUrl = `${window.location.origin}${window.location.pathname}?share=${encodedData}`;
+    
+    const msg = `היי, אני משתף איתך פעילות עבור ${kidName}: *${act.title}*\nניתן להוסיף אותה ללוח שלך בלחיצה כאן:\n${shareUrl}`;
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
 function shareEntireKid(kidId, kidName) {
     userKidsRef.child(kidId).once("value", snap => {
         const kid = snap.val();
-        const activities = kid.activities || [];
-        if (activities.length === 0) return alert("אין פעילויות לשיתוף");
+        const shareData = { type: 'kid', kidName: kid.name, activities: kid.activities || [] };
+        const encodedData = btoa(unescape(encodeURIComponent(JSON.stringify(shareData))));
+        const shareUrl = `${window.location.origin}${window.location.pathname}?share=${encodedData}`;
         
-        let msg = `*הלו"ז המלא של ${kidName}:*\n`;
-        activities.sort((a,b) => a.date.localeCompare(b.date)).forEach(a => {
-            const d = a.date.split('-').reverse().join('/');
-            msg += `\n• ${d} | ${a.time || '--:--'} - ${a.title}`;
-        });
+        const msg = `היי, אני משתף איתך את כל הלוח של *${kid.name}*!\nלהוספה ללוח שלך לחצי כאן:\n${shareUrl}`;
         window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
     });
+}
+
+// 2. בדיקת ייבוא בטעינת הדף
+function checkIncomingShare() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const sharedDataRaw = urlParams.get('share');
+    
+    if (sharedDataRaw && auth.currentUser) {
+        try {
+            const decodedData = JSON.parse(decodeURIComponent(escape(atob(sharedDataRaw))));
+            
+            if (decodedData.type === 'kid') {
+                if (confirm(`האם תרצי להוסיף את "${decodedData.kidName}" והפעילויות שלו ללוח שלך?`)) {
+                    const newRef = userKidsRef.push();
+                    newRef.set({ id: newRef.key, name: decodedData.kidName, activities: decodedData.activities });
+                    alert("הילד נוסף בהצלחה!");
+                }
+            } else if (decodedData.type === 'single') {
+                userKidsRef.once("value", snap => {
+                    const kids = snap.val();
+                    if (!kids) return alert("עליך להוסיף ילד קודם");
+                    
+                    const kidNames = Object.values(kids).map(k => k.name);
+                    const targetKid = prompt(`לאיזה ילד להוסיף את הפעילות "${decodedData.activity.title}"?\nאפשרויות: ${kidNames.join(", ")}`);
+                    
+                    const kidEntry = Object.entries(kids).find(([id, k]) => k.name === targetKid);
+                    if (kidEntry) {
+                        const [id, kid] = kidEntry;
+                        const newList = [...(kid.activities || []), { ...decodedData.activity, id: "a_" + Date.now() }];
+                        userKidsRef.child(id).child("activities").set(newList);
+                        alert("הפעילות נוספה!");
+                    }
+                });
+            }
+            // ניקוי ה-URL אחרי הייבוא
+            window.history.replaceState({}, document.title, window.location.pathname);
+        } catch (e) { console.error("Share error", e); }
+    }
 }
 
 function updateUI() {
