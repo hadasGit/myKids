@@ -224,7 +224,7 @@ auth.onAuthStateChanged(user => {
         userKidsRef = null;
     }
 });
-
+// 1. פונקציית הרינדור המרכזית המתוקנת
 function renderKids(kids) {
     const container = document.getElementById("kids-container");
     const timelineList = document.getElementById("timeline-list");
@@ -241,9 +241,8 @@ function renderKids(kids) {
         const kid = kids[kidId];
         const activities = kid.activities || [];
         
-        // 1. איסוף ללו"ז המשותף עם סינון מתקדם
+        // --- איסוף ללו"ז המשפחתי ---
         activities.forEach(a => {
-            // לוגיקת סננים
             if (currentFilterType === 'transport' && !a.isTransport) return;
             if (currentFilterType === 'permanent' && !a.isPermanent) return;
             if (currentFilterType === 'recurring' && !a.repeatWeekly) return;
@@ -251,9 +250,10 @@ function renderKids(kids) {
 
             const checkMatch = (dStr) => {
                 const d = new Date(dStr);
-                return a.date === dStr || 
-                       (a.repeatWeekly && new Date(a.date).getDay() === d.getDay()) || 
-                       (a.isPermanent && a.date <= dStr);
+                // פתק קבוע מופיע רק בתאריך שלו (כפי שביקשת)
+                if (a.isPermanent) return a.date === dStr;
+                // פעילות חוזרת או רגילה
+                return a.date === dStr || (a.repeatWeekly && new Date(a.date).getDay() === d.getDay());
             };
 
             if (currentTimelineView === 'daily') {
@@ -267,51 +267,44 @@ function renderKids(kids) {
             }
         });
 
-        // 2. בניית קוביית הילד - החזרת כל האייקונים והקבועים
+        // --- בניית קוביית הילד (UI) ---
         const box = document.createElement("div");
         box.className = "kid-box";
         box.onclick = () => openKidModal(kidId, kid);
-        
-        // כותרת שם
-        const nameEl = document.createElement("div");
-        nameEl.innerHTML = `<strong>${kid.name}</strong>`;
-        nameEl.style.fontSize = "22px";
-        nameEl.style.marginBottom = "10px";
-        box.appendChild(nameEl);
+        box.innerHTML = `<strong>${kid.name}</strong><div class="act-list-mini" style="margin-top:10px;"></div>`;
+        const miniList = box.querySelector(".act-list-mini");
 
-        const actList = document.createElement("div");
         activities.forEach(a => {
-            const isMatch = !a.isPermanent && (a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === baseDate.getDay()));
-            if (isMatch) {
-                const aEl = document.createElement("div");
-                aEl.style.fontSize = "15px";
-                // החזרת האייקונים לקוביות
-                aEl.textContent = `${a.time || ""} ${a.title}${a.isTransport ? ' 🚗' : ''}${a.repeatWeekly ? ' 🔁' : ''}`;
-                actList.appendChild(aEl);
+            const isMatch = a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === baseDate.getDay());
+            
+            // הצגת פעילויות רגילות/חוזרות/הסעות עם אייקונים
+            if (!a.isPermanent && isMatch) {
+                const div = document.createElement("div");
+                div.style.fontSize = "15px";
+                div.textContent = `${a.time || ""} ${a.title}${a.isTransport ? ' 🚗' : ''}${a.repeatWeekly ? ' 🔁' : ''}`;
+                miniList.appendChild(div);
+            }
+            
+            // הצגת הודעות קבועות בתוך הקוביה אם התאריך מתאים
+            if (a.isPermanent && a.date === selectedDate) {
+                const nDiv = document.createElement("div");
+                nDiv.className = "permanent-note";
+                nDiv.textContent = `📌 ${note.title}`; // תיקון ל-a.title
+                box.appendChild(nDiv);
             }
         });
-        box.appendChild(actList);
 
-        // החזרת הפתקים הקבועים לקוביית הילד
-        activities.filter(a => a.isPermanent && a.date <= selectedDate).forEach(note => {
-            const nDiv = document.createElement("div");
-            nDiv.className = "permanent-note";
-            nDiv.textContent = `📌 ${note.title}`;
-            box.appendChild(nDiv);
-        });
-
-        // כפתור מחיקת ילד
         const del = document.createElement("span");
         del.className = "delete-kid"; del.innerHTML = "&times;";
         del.onclick = (e) => { e.stopPropagation(); if(confirm(`למחוק את ${kid.name}?`)) userKidsRef.child(kidId).remove(); };
         box.appendChild(del);
-
         container.appendChild(box);
     });
 
-    // 3. רינדור הלו"ז המרוכז
     renderTimelineList(allActivities, timelineList, timelineContainer);
 }
+
+
 
 // פונקציית עזר לרינדור הרשימה (כדי שהקוד יהיה נקי)
 function renderTimelineList(allActivities, timelineList, timelineContainer) {
@@ -342,7 +335,7 @@ function renderTimelineList(allActivities, timelineList, timelineContainer) {
         timelineContainer.style.display = "none";
     }
 }
-    
+// 2. עדכון חלון העריכה (המודל) עם אייקונים ברשימה
 function openKidModal(kidId, kid, activityToEdit = null) {
     const modalContent = document.getElementById("modalContent");
     const modalTitle = document.getElementById("modalTitle");
@@ -352,20 +345,17 @@ function openKidModal(kidId, kid, activityToEdit = null) {
     const activities = kid.activities || [];
 
     if (!activityToEdit) {
-        const shareBtn = document.createElement("button");
-        shareBtn.innerHTML = "🔗 שתף לוח של " + kid.name;
-        shareBtn.style = "margin-bottom:15px; background:#10b981; color:white; border:none; padding:10px; border-radius:8px; cursor:pointer; width:100%; font-weight:bold;";
-        shareBtn.onclick = () => shareEntireKid(kidId, kid.name);
-        modalContent.appendChild(shareBtn);
-
         const list = document.createElement("div");
         activities.sort((a,b) => a.date.localeCompare(b.date)).forEach(a => {
             const item = document.createElement("div");
             item.className = "activity-item";
-            let displayDate = a.date;
-            if (a.repeatWeekly) displayDate = getNextOccurrence(a.date, todayStr());
-            const dateFmt = displayDate.split('-').reverse().join('/');
-            item.innerHTML = `<span>${dateFmt} | ${a.time || '--:--'} ${a.title}</span>
+            const dateFmt = a.date.split('-').reverse().join('/');
+            
+            // הוספת אייקונים לרשימה בחלון
+            const icons = `${a.isPermanent ? '📌' : ''}${a.isTransport ? '🚗' : ''}${a.repeatWeekly ? '🔁' : ''}`;
+            
+            item.innerHTML = `
+                <span>${dateFmt} | ${a.time || '--:--'} ${a.title} ${icons}</span>
                 <div>
                     <button class="btn-edit" onclick="event.stopPropagation(); openKidModal('${kidId}', ${JSON.stringify(kid).replace(/"/g, '&quot;')}, ${JSON.stringify(a).replace(/"/g, '&quot;')})">✏️</button>
                     <button class="btn-delete" onclick="event.stopPropagation(); deleteActivity('${kidId}', '${a.id}')">🗑️</button>
@@ -374,7 +364,6 @@ function openKidModal(kidId, kid, activityToEdit = null) {
         });
         modalContent.appendChild(list);
     }
-
     const form = document.createElement("div");
     form.className = "add-activity-form";
     const defDate = activityToEdit ? activityToEdit.date : todayStr();
