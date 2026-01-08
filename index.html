@@ -79,6 +79,19 @@ const dateFilter = document.getElementById("dateFilter");
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 dateFilter.value = todayStr();
 
+    // המערכת בודקת אם התאריך עבר, ואם כן - מוסיפה שבועות עד שמגיעה לתאריך הבא
+function getNextOccurrence(originalDateStr, targetDateStr) {
+    let original = new Date(originalDateStr);
+    let target = new Date(targetDateStr);
+    
+    if (original >= target) return originalDateStr;
+    
+    let next = new Date(original);
+    while (next < target) {
+        next.setDate(next.getDate() + 7);
+    }
+    return next.toISOString().slice(0, 10);
+}
 // --- רינדור דף ראשי ---
 function renderKids(kids) {
     const kidsContainer = document.getElementById("kids-container");
@@ -154,10 +167,10 @@ modalTitle.innerHTML = activityToEdit ? `עריכת פעילות: ${activityToEd
 if (!activityToEdit) {
     const shareBtn = document.createElement("button");
     shareBtn.innerHTML = "🔗 שתף הכל";
-    shareBtn.style = "margin-right:15px; background:#10b981; color:white; border:none; padding:5px 10px; border-radius:20px; cursor:pointer; font-size:14px;";
-    shareBtn.onclick = () => shareEntireKid(kidId, kid.name); // שולחים רק ID ושם
-    modalTitle.appendChild(shareBtn);
-}
+    shareBtn.style = "margin-bottom:10px; background:#10b981; color:white; border:none; padding:8px; border-radius:8px; cursor:pointer; width:100%;";
+    shareBtn.onclick = () => shareEntireKid(kidId, kid.name);
+    modalContent.appendChild(shareBtn);
+    }
   //  modalTitle.textContent = activityToEdit ? `עריכת פעילות: ${activityToEdit.title}` : kid.name;
     modalContent.innerHTML = "";
     modalBackdrop.style.display = "flex";
@@ -172,15 +185,22 @@ if (!activityToEdit) {
             item.className = "activity-item";
             const repeatSign = a.repeatWeekly ? ' 🔁' : '';
             const permSign = a.isPermanent ? ' 📌' : '';
-           item.innerHTML = `
-            <span>${a.date.split('-').reverse().join('/')} | ${a.time || '--:--'} ${a.title}${repeatSign}${permSign}</span>
+                            
+            let displayDate = a.date;
+            if (a.repeatWeekly) {
+                displayDate = getNextOccurrence(a.date, todayStr()); // מחשב את התאריך הקרוב ביותר להיום
+            }
+                
+            const dateFmt = displayDate.split('-').reverse().join('/'); // הופך לפורמט DD/MM/YYYY
+            item.innerHTML = `
+            <span>${formattedDate} | ${a.time || '--:--'} ${a.title}${repeatSign}${permSign}</span>
             <div>
                 <button class="btn-share" onclick="shareActivity('${kid.name}', ${JSON.stringify(a).replace(/"/g, '&quot;')})" style="background:#10b981; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">🔗</button>
                 <button class="btn-edit" id="edit-${a.id}">✏️</button>
                 <button class="btn-delete" onclick="deleteActivity('${kidId}', '${a.id}')">🗑️</button>
             </div>
         `;
-        
+
             list.appendChild(item);
             item.querySelector(`#edit-${a.id}`).onclick = () => openKidModal(kidId, kid, a);
         });
