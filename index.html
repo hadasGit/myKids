@@ -160,57 +160,60 @@ function openKidModal(kidId, kid, activityToEdit = null) {
     const modalContent = document.getElementById("modalContent");
     const modalTitle = document.getElementById("modalTitle");
  
-   // בתוך openKidModal
-modalTitle.innerHTML = activityToEdit ? `עריכת פעילות: ${activityToEdit.title}` : kid.name;
-
-// הוספת כפתור השיתוף בצורה נקייה (רק אם אנחנו לא במצב עריכה)
-if (!activityToEdit) {
-    const shareBtn = document.createElement("button");
-    shareBtn.innerHTML = "🔗 שתף הכל";
-    shareBtn.style = "margin-bottom:10px; background:#10b981; color:white; border:none; padding:8px; border-radius:8px; cursor:pointer; width:100%;";
-    shareBtn.onclick = () => shareEntireKid(kidId, kid.name);
-    modalContent.appendChild(shareBtn);
-    }
-  //  modalTitle.textContent = activityToEdit ? `עריכת פעילות: ${activityToEdit.title}` : kid.name;
+    // קביעת הכותרת
+    modalTitle.innerHTML = activityToEdit ? `עריכת פעילות: ${activityToEdit.title}` : kid.name;
+    
+    // ניקוי התוכן הקודם
     modalContent.innerHTML = "";
     modalBackdrop.style.display = "flex";
 
     const activities = kid.activities || [];
 
     if (!activityToEdit) {
+        // 1. הוספת כפתור שיתוף כללי בראש הרשימה
+        const shareBtn = document.createElement("button");
+        shareBtn.innerHTML = "🔗 שתף את כל הלוח של " + kid.name;
+        shareBtn.style = "margin-bottom:15px; background:#10b981; color:white; border:none; padding:10px; border-radius:8px; cursor:pointer; width:100%; font-weight:bold;";
+        shareBtn.onclick = () => shareEntireKid(kidId, kid.name);
+        modalContent.appendChild(shareBtn);
+
+        // 2. בניית רשימת הפעילויות
         const list = document.createElement("div");
         list.className = "activity-list";
+        
         activities.sort((a,b) => a.date.localeCompare(b.date)).forEach(a => {
             const item = document.createElement("div");
             item.className = "activity-item";
             const repeatSign = a.repeatWeekly ? ' 🔁' : '';
             const permSign = a.isPermanent ? ' 📌' : '';
-                            
+                                    
+            // חישוב תאריך להצגה (סעיף 2 שלך)
             let displayDate = a.date;
             if (a.repeatWeekly) {
-                displayDate = getNextOccurrence(a.date, todayStr()); // מחשב את התאריך הקרוב ביותר להיום
+                displayDate = getNextOccurrence(a.date, todayStr());
             }
-                
-            const dateFmt = displayDate.split('-').reverse().join('/'); // הופך לפורמט DD/MM/YYYY
+            const dateFmt = displayDate.split('-').reverse().join('/'); 
+
             item.innerHTML = `
-            <span>${formattedDate} | ${a.time || '--:--'} ${a.title}${repeatSign}${permSign}</span>
-            <div>
-                <button class="btn-share" onclick="shareActivity('${kid.name}', ${JSON.stringify(a).replace(/"/g, '&quot;')})" style="background:#10b981; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">🔗</button>
-                <button class="btn-edit" id="edit-${a.id}">✏️</button>
-                <button class="btn-delete" onclick="deleteActivity('${kidId}', '${a.id}')">🗑️</button>
-            </div>
-        `;
+                <span>${dateFmt} | ${a.time || '--:--'} ${a.title}${repeatSign}${permSign}</span>
+                <div>
+                    <button class="btn-share" onclick="shareActivity('${kid.name}', ${JSON.stringify(a).replace(/"/g, '&quot;')})" style="background:#10b981; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">🔗</button>
+                    <button class="btn-edit" id="edit-${a.id}">✏️</button>
+                    <button class="btn-delete" onclick="deleteActivity('${kidId}', '${a.id}')">🗑️</button>
+                </div>
+            `;
 
             list.appendChild(item);
-            item.querySelector(`#edit-${a.id}`).onclick = () => openKidModal(kidId, kid, a);
+            // הגדרת כפתור עריכה
+            const editBtn = item.querySelector(`#edit-${a.id}`);
+            if (editBtn) editBtn.onclick = () => openKidModal(kidId, kid, a);
         });
         modalContent.appendChild(list);
     }
 
+    // 3. טופס הוספה/עריכה (נשאר בסוף המודל)
     const form = document.createElement("div");
     form.className = "add-activity-form";
-    
-    // תאריך ברירת מחדל: היום (או התאריך המקורי אם עורכים)
     const defaultDate = activityToEdit ? activityToEdit.date : todayStr();
 
     form.innerHTML = `
@@ -247,12 +250,7 @@ if (!activityToEdit) {
             isTransport: document.getElementById("newActTrans").checked
         };
 
-        let updatedList;
-        if (activityToEdit) {
-            updatedList = activities.map(a => a.id === activityToEdit.id ? newActData : a);
-        } else {
-            updatedList = [...activities, newActData];
-        }
+        let updatedList = activityToEdit ? activities.map(a => a.id === activityToEdit.id ? newActData : a) : [...activities, newActData];
 
         userKidsRef.child(kidId).child("activities").set(updatedList).then(() => {
             if (activityToEdit) openKidModal(kidId, kid);
