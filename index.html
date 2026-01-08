@@ -224,7 +224,6 @@ auth.onAuthStateChanged(user => {
         userKidsRef = null;
     }
 });
-// 1. פונקציית הרינדור המרכזית המתוקנת
 function renderKids(kids) {
     const container = document.getElementById("kids-container");
     const timelineList = document.getElementById("timeline-list");
@@ -241,58 +240,64 @@ function renderKids(kids) {
         const kid = kids[kidId];
         const activities = kid.activities || [];
         
-        // --- איסוף ללו"ז המשפחתי ---
+        // --- 1. בניית קוביית הילד ---
+        const box = document.createElement("div");
+        box.className = "kid-box";
+        box.onclick = () => openKidModal(kidId, kid);
+        
+        const nameEl = document.createElement("div");
+        nameEl.innerHTML = `<strong>${kid.name}</strong>`;
+        nameEl.style.fontSize = "22px";
+        nameEl.style.marginBottom = "10px";
+        box.appendChild(nameEl);
+
+        const actList = document.createElement("div");
+        
         activities.forEach(a => {
+            // בדיקת התאמה לתאריך הנבחר
+            const isMatch = a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === baseDate.getDay());
+            
+            // הצגת פעילויות רגילות/חוזרות/הסעות
+            if (!a.isPermanent && isMatch) {
+                const aEl = document.createElement("div");
+                aEl.style.fontSize = "15px";
+                aEl.textContent = `${a.time || ""} ${a.title}${a.isTransport ? ' 🚗' : ''}${a.repeatWeekly ? ' 🔁' : ''}`;
+                actList.appendChild(aEl);
+            }
+            
+            // הצגת הודעות קבועות (📌) בתוך הקוביה - תיקון כאן:
+            if (a.isPermanent && a.date === selectedDate) {
+                const nDiv = document.createElement("div");
+                nDiv.className = "permanent-note";
+                nDiv.style = "background: #ffe5c2; color: #c45d00; padding: 6px 10px; border-radius: 10px; font-size: 13px; margin-top: 6px; font-weight: bold;";
+                nDiv.textContent = `📌 ${a.title}`; // תוקן מ-note ל-a
+                box.appendChild(nDiv);
+            }
+
+            // --- 2. איסוף ללו"ז המשפחתי (עם סינון) ---
             if (currentFilterType === 'transport' && !a.isTransport) return;
             if (currentFilterType === 'permanent' && !a.isPermanent) return;
             if (currentFilterType === 'recurring' && !a.repeatWeekly) return;
             if (currentFilterType === 'regular' && (a.isTransport || a.isPermanent || a.repeatWeekly)) return;
 
-            const checkMatch = (dStr) => {
+            const checkTimelineMatch = (dStr) => {
                 const d = new Date(dStr);
-                // פתק קבוע מופיע רק בתאריך שלו (כפי שביקשת)
-                if (a.isPermanent) return a.date === dStr;
-                // פעילות חוזרת או רגילה
+                if (a.isPermanent) return a.date === dStr; // מופיע רק בתאריך שלו
                 return a.date === dStr || (a.repeatWeekly && new Date(a.date).getDay() === d.getDay());
             };
 
             if (currentTimelineView === 'daily') {
-                if (checkMatch(selectedDate)) allActivities.push({ ...a, kidName: kid.name, displayDate: selectedDate });
+                if (checkTimelineMatch(selectedDate)) allActivities.push({ ...a, kidName: kid.name, displayDate: selectedDate });
             } else {
                 for (let i = 0; i < 7; i++) {
                     let t = new Date(baseDate); t.setDate(baseDate.getDate() + i);
                     let ts = t.toISOString().slice(0, 10);
-                    if (checkMatch(ts)) allActivities.push({ ...a, kidName: kid.name, displayDate: ts });
+                    if (checkTimelineMatch(ts)) allActivities.push({ ...a, kidName: kid.name, displayDate: ts });
                 }
             }
         });
 
-        // --- בניית קוביית הילד (UI) ---
-        const box = document.createElement("div");
-        box.className = "kid-box";
-        box.onclick = () => openKidModal(kidId, kid);
-        box.innerHTML = `<strong>${kid.name}</strong><div class="act-list-mini" style="margin-top:10px;"></div>`;
-        const miniList = box.querySelector(".act-list-mini");
-
-        activities.forEach(a => {
-            const isMatch = a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === baseDate.getDay());
-            
-            // הצגת פעילויות רגילות/חוזרות/הסעות עם אייקונים
-            if (!a.isPermanent && isMatch) {
-                const div = document.createElement("div");
-                div.style.fontSize = "15px";
-                div.textContent = `${a.time || ""} ${a.title}${a.isTransport ? ' 🚗' : ''}${a.repeatWeekly ? ' 🔁' : ''}`;
-                miniList.appendChild(div);
-            }
-            
-            // הצגת הודעות קבועות בתוך הקוביה אם התאריך מתאים
-            if (a.isPermanent && a.date === selectedDate) {
-                const nDiv = document.createElement("div");
-                nDiv.className = "permanent-note";
-                nDiv.textContent = `📌 ${note.title}`; // תיקון ל-a.title
-                box.appendChild(nDiv);
-            }
-        });
+        box.insertBefore(actList, box.querySelector(".permanent-note")); // סדר ויזואלי
 
         const del = document.createElement("span");
         del.className = "delete-kid"; del.innerHTML = "&times;";
@@ -303,9 +308,6 @@ function renderKids(kids) {
 
     renderTimelineList(allActivities, timelineList, timelineContainer);
 }
-
-
-
 // פונקציית עזר לרינדור הרשימה (כדי שהקוד יהיה נקי)
 function renderTimelineList(allActivities, timelineList, timelineContainer) {
     if (allActivities.length > 0) {
