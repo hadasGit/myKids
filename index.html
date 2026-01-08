@@ -240,11 +240,13 @@ function renderKids(kids) {
         const kid = kids[kidId];
         const activities = kid.activities || [];
         
-        // --- 1. בניית קוביית הילד ---
+        // יצירת הקובייה הלבנה
         const box = document.createElement("div");
         box.className = "kid-box";
+        box.style.position = "relative";
         box.onclick = () => openKidModal(kidId, kid);
         
+        // שם הילד
         const nameEl = document.createElement("div");
         nameEl.innerHTML = `<strong>${kid.name}</strong>`;
         nameEl.style.fontSize = "22px";
@@ -254,27 +256,28 @@ function renderKids(kids) {
         const actList = document.createElement("div");
         
         activities.forEach(a => {
-            // בדיקת התאמה לתאריך הנבחר
             const isMatch = a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === baseDate.getDay());
             
-            // הצגת פעילויות רגילות/חוזרות/הסעות
+            // --- הצגת פעילויות רגילות בתוך הקובייה ---
             if (!a.isPermanent && isMatch) {
                 const aEl = document.createElement("div");
-                aEl.style.fontSize = "15px";
+                aEl.style.fontSize = "16px";
+                aEl.style.margin = "4px 0";
+                // הוספת האייקונים 🚗 ו-🔁
                 aEl.textContent = `${a.time || ""} ${a.title}${a.isTransport ? ' 🚗' : ''}${a.repeatWeekly ? ' 🔁' : ''}`;
                 actList.appendChild(aEl);
             }
             
-            // הצגת הודעות קבועות (📌) בתוך הקוביה - תיקון כאן:
+            // --- הצגת הודעה קבועה (📌) בתוך הקובייה ---
             if (a.isPermanent && a.date === selectedDate) {
                 const nDiv = document.createElement("div");
                 nDiv.className = "permanent-note";
-                nDiv.style = "background: #ffe5c2; color: #c45d00; padding: 6px 10px; border-radius: 10px; font-size: 13px; margin-top: 6px; font-weight: bold;";
-                nDiv.textContent = `📌 ${a.title}`; // תוקן מ-note ל-a
-                box.appendChild(nDiv);
+                nDiv.style = "background: #ffe5c2; color: #c45d00; padding: 8px; border-radius: 8px; font-size: 14px; margin-top: 10px; font-weight: bold; border: 1px solid #ffcc80;";
+                nDiv.textContent = `📌 ${a.title}`;
+                actList.appendChild(nDiv);
             }
 
-            // --- 2. איסוף ללו"ז המשפחתי (עם סינון) ---
+            // --- איסוף ללו"ז המשפחתי המרוכז ---
             if (currentFilterType === 'transport' && !a.isTransport) return;
             if (currentFilterType === 'permanent' && !a.isPermanent) return;
             if (currentFilterType === 'recurring' && !a.repeatWeekly) return;
@@ -282,7 +285,7 @@ function renderKids(kids) {
 
             const checkTimelineMatch = (dStr) => {
                 const d = new Date(dStr);
-                if (a.isPermanent) return a.date === dStr; // מופיע רק בתאריך שלו
+                if (a.isPermanent) return a.date === dStr;
                 return a.date === dStr || (a.repeatWeekly && new Date(a.date).getDay() === d.getDay());
             };
 
@@ -297,17 +300,24 @@ function renderKids(kids) {
             }
         });
 
-        box.insertBefore(actList, box.querySelector(".permanent-note")); // סדר ויזואלי
+        box.appendChild(actList);
 
+        // כפתור מחיקה (X אדום)
         const del = document.createElement("span");
-        del.className = "delete-kid"; del.innerHTML = "&times;";
+        del.className = "delete-kid";
+        del.innerHTML = "&times;";
+        del.style = "position: absolute; top: 5px; right: 10px; color: red; cursor: pointer; font-size: 24px;";
         del.onclick = (e) => { e.stopPropagation(); if(confirm(`למחוק את ${kid.name}?`)) userKidsRef.child(kidId).remove(); };
         box.appendChild(del);
+
         container.appendChild(box);
     });
 
+    // רינדור הלו"ז המרוכז (כולל כפתור הווטסאפ)
     renderTimelineList(allActivities, timelineList, timelineContainer);
 }
+
+
 // פונקציית עזר לרינדור הרשימה (כדי שהקוד יהיה נקי)
 function renderTimelineList(allActivities, timelineList, timelineContainer) {
     if (allActivities.length > 0) {
@@ -337,7 +347,7 @@ function renderTimelineList(allActivities, timelineList, timelineContainer) {
         timelineContainer.style.display = "none";
     }
 }
-// 2. עדכון חלון העריכה (המודל) עם אייקונים ברשימה
+// פונקציה להחזרת כפתורי השיתוף בתוך המודל (כשפותחים ילד)
 function openKidModal(kidId, kid, activityToEdit = null) {
     const modalContent = document.getElementById("modalContent");
     const modalTitle = document.getElementById("modalTitle");
@@ -347,18 +357,24 @@ function openKidModal(kidId, kid, activityToEdit = null) {
     const activities = kid.activities || [];
 
     if (!activityToEdit) {
+        // כפתור שיתוף כללי לילד
+        const shareBtn = document.createElement("button");
+        shareBtn.innerHTML = "🔗 שיתוף לוח אישי";
+        shareBtn.style = "margin-bottom:15px; background:#10b981; color:white; border:none; padding:10px; border-radius:8px; cursor:pointer; width:100%; font-weight:bold;";
+        shareBtn.onclick = () => shareEntireKid(kidId, kid.name);
+        modalContent.appendChild(shareBtn);
+
         const list = document.createElement("div");
         activities.sort((a,b) => a.date.localeCompare(b.date)).forEach(a => {
             const item = document.createElement("div");
             item.className = "activity-item";
             const dateFmt = a.date.split('-').reverse().join('/');
-            
-            // הוספת אייקונים לרשימה בחלון
             const icons = `${a.isPermanent ? '📌' : ''}${a.isTransport ? '🚗' : ''}${a.repeatWeekly ? '🔁' : ''}`;
             
             item.innerHTML = `
-                <span>${dateFmt} | ${a.time || '--:--'} ${a.title} ${icons}</span>
-                <div>
+                <span style="flex:1">${dateFmt} | ${a.time || '--:--'} ${a.title} ${icons}</span>
+                <div style="display:flex; gap:5px;">
+                    <button onclick="event.stopPropagation(); shareActivity('${kid.name}', ${JSON.stringify(a).replace(/"/g, '&quot;')})" style="background:#10b981; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">🔗</button>
                     <button class="btn-edit" onclick="event.stopPropagation(); openKidModal('${kidId}', ${JSON.stringify(kid).replace(/"/g, '&quot;')}, ${JSON.stringify(a).replace(/"/g, '&quot;')})">✏️</button>
                     <button class="btn-delete" onclick="event.stopPropagation(); deleteActivity('${kidId}', '${a.id}')">🗑️</button>
                 </div>`;
@@ -366,6 +382,7 @@ function openKidModal(kidId, kid, activityToEdit = null) {
         });
         modalContent.appendChild(list);
     }
+    
     const form = document.createElement("div");
     form.className = "add-activity-form";
     const defDate = activityToEdit ? activityToEdit.date : todayStr();
@@ -397,7 +414,10 @@ function openKidModal(kidId, kid, activityToEdit = null) {
             userKidsRef.child(kidId).once("value", s => openKidModal(kidId, s.val()));
         });
     };
+    קוד יצירת הפורם (נשאר כפי שהיה)
+    renderActivityForm(kidId, kid, activityToEdit, modalContent);
 }
+
 
 window.deleteActivity = (kidId, actId) => {
     if(!confirm("למחוק?")) return;
