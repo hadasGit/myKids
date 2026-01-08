@@ -3,45 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>הילדים שלי</title>
+    <title>הילדים שלי - מאובטח</title>
     <style>
         body { font-family: Arial, sans-serif; background: #f3f3f3; margin: 0; padding: 20px; direction: rtl; }
-        h1 { text-align: center; }
-        #kids-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            grid-gap: 15px;
-            margin-top: 20px;
-        }
+        h1 { text-align: center; color: #333; }
+        #auth-section { text-align: center; margin-bottom: 20px; background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        #kids-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); grid-gap: 15px; margin-top: 20px; }
         .kid-box { background: white; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0px 2px 5px rgba(0,0,0,0.1); font-size: 18px; cursor: pointer; position: relative; }
         .delete-kid { position: absolute; top: 5px; right: 5px; cursor: pointer; color: red; font-weight: bold; font-size: 20px; }
         #addKidBtn { display: block; width: 100%; padding: 15px; margin-top: 20px; font-size: 18px; border: none; background: #4CAF50; color: white; border-radius: 8px; cursor: pointer; }
         #dateFilter { padding: 6px; font-size: 16px; border-radius: 6px; border: 1px solid #ccc; }
-        
         #modalBackdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); align-items: center; justify-content: center; z-index: 999; }
-        #modal { background: white; border-radius: 12px; max-width: 400px; width: 90%; max-height: 85vh; overflow-y: auto; padding: 20px; position: relative; }
+        #modal { background: white; border-radius: 12px; max-width: 400px; width: 95%; max-height: 90vh; overflow-y: auto; padding: 20px; position: relative; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
         .close-btn { border: none; background: transparent; font-size: 1.5rem; cursor: pointer; }
-        .activity-list { margin-bottom: 20px; }
-        .activity-item { border-bottom: 1px solid #eee; padding: 8px 0; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; gap: 5px; }
-        .add-activity-form { display: flex; flex-direction: column; gap: 8px; background: #f9f9f9; padding: 10px; border-radius: 8px; margin-top:10px; }
+        .activity-item { border-bottom: 1px solid #eee; padding: 10px 0; font-size: 0.95rem; display: flex; justify-content: space-between; align-items: center; }
+        .add-activity-form { display: flex; flex-direction: column; gap: 8px; background: #f9f9f9; padding: 10px; border-radius: 8px; margin-top:15px; }
         .add-activity-form input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
         .permanent-note { background: #ffe5c2; color: #c45d00; padding: 6px 10px; border-radius: 10px; font-size: 13px; margin-top: 6px; font-weight: bold; }
-        .btn-edit { background: #3b82f6; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; }
-        .btn-delete { background: #ef4444; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; }
+        .btn-google { background: #4285F4; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<h1>הילדים שלי</h1>
-
-<div style="display:flex; align-items:center; gap:8px; justify-content:center;">
-    <input type="date" id="dateFilter">
-    <button id="refreshBtn" title="סנן לפי תאריך" style="background:#4CAF50; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer;">🔄 סנן פעילויות</button>
+<div id="auth-section">
+    <div id="user-info">
+        <p id="user-status">טוען...</p>
+        <button id="loginBtn" class="btn-google" style="display:none;">התחברות עם Google</button>
+        <button id="logoutBtn" style="display:none; background:none; border:none; color:#666; text-decoration:underline; cursor:pointer;">התנתק</button>
+    </div>
 </div>
 
-<button id="addKidBtn">הוסף ילד</button>
-<div id="kids-container"></div>
+<div id="main-content" style="display:none;">
+    <h1>הילדים שלי</h1>
+    <div style="display:flex; align-items:center; gap:8px; justify-content:center;">
+        <input type="date" id="dateFilter">
+        <button id="refreshBtn" style="background:#4CAF50; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer;">🔄 סנן</button>
+    </div>
+    <button id="addKidBtn">הוסף ילד חדש</button>
+    <div id="kids-container"></div>
+</div>
 
 <div id="modalBackdrop">
     <div id="modal">
@@ -55,9 +56,9 @@
 
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
 
 <script>
-// --- הגדרות פיירבייס ---
 const firebaseConfig = {
   apiKey: "AIzaSyD9IzSor82cM39XgdLbywBdq-bM8m2c_ak",
   authDomain: "mykids-3f832.firebaseapp.com",
@@ -68,37 +69,56 @@ const firebaseConfig = {
   measurementId: "G-Q3X18J3SJ4",
   databaseURL:  "https://mykids-3f832-default-rtdb.firebaseio.com"
 };
+
 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
+const auth = firebase.auth();
+let userKidsRef = null;
 
-let currentUserId = localStorage.getItem("currentUserId") || "user_" + Math.random().toString(36).substr(2, 9);
-localStorage.setItem("currentUserId", currentUserId);
-const userKidsRef = db.ref(`users/${currentUserId}/kids`);
-
-const dateFilter = document.getElementById("dateFilter");
+// --- פונקציות עזר ---
 function todayStr() { return new Date().toISOString().slice(0, 10); }
-dateFilter.value = todayStr();
+document.getElementById("dateFilter").value = todayStr();
 
-    // המערכת בודקת אם התאריך עבר, ואם כן - מוסיפה שבועות עד שמגיעה לתאריך הבא
 function getNextOccurrence(originalDateStr, targetDateStr) {
     let original = new Date(originalDateStr);
     let target = new Date(targetDateStr);
-    
     if (original >= target) return originalDateStr;
-    
     let next = new Date(original);
-    while (next < target) {
-        next.setDate(next.getDate() + 7);
-    }
+    while (next < target) { next.setDate(next.getDate() + 7); }
     return next.toISOString().slice(0, 10);
 }
-// --- רינדור דף ראשי ---
+
+// --- ניהול משתמש ---
+auth.onAuthStateChanged(user => {
+    if (user) {
+        document.getElementById("user-status").textContent = `שלום, ${user.displayName}`;
+        document.getElementById("loginBtn").style.display = "none";
+        document.getElementById("logoutBtn").style.display = "inline-block";
+        document.getElementById("main-content").style.display = "block";
+        userKidsRef = db.ref(`users/${user.uid}/kids`);
+        userKidsRef.on("value", snapshot => renderKids(snapshot.val()));
+    } else {
+        document.getElementById("user-status").textContent = "אנא התחברי כדי לצפות בנתונים";
+        document.getElementById("loginBtn").style.display = "inline-block";
+        document.getElementById("logoutBtn").style.display = "none";
+        document.getElementById("main-content").style.display = "none";
+        userKidsRef = null;
+    }
+});
+
+document.getElementById("loginBtn").onclick = () => {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider);
+};
+document.getElementById("logoutBtn").onclick = () => auth.signOut();
+
+// --- רינדור ---
 function renderKids(kids) {
-    const kidsContainer = document.getElementById("kids-container");
-    kidsContainer.innerHTML = "";
+    const container = document.getElementById("kids-container");
+    container.innerHTML = "";
     if (!kids) return;
 
-    const selectedDate = dateFilter.value; // התאריך שנבחר בלוח למעלה
+    const selectedDate = document.getElementById("dateFilter").value;
     const selectedDay = new Date(selectedDate).getDay();
 
     Object.keys(kids).forEach(kidId => {
@@ -108,180 +128,137 @@ function renderKids(kids) {
         box.onclick = () => openKidModal(kidId, kid);
 
         const nameEl = document.createElement("div");
-        nameEl.textContent = kid.name;
-        nameEl.style.fontWeight = "bold";
+        nameEl.innerHTML = `<strong>${kid.name}</strong>`;
         nameEl.style.fontSize = "22px";
         box.appendChild(nameEl);
 
         const activities = kid.activities || [];
-
-        // 1. פעילויות רגילות/חוזרות לאותו יום
-        const todaysActivities = activities.filter(a => 
-            !a.isPermanent && (a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === selectedDay))
-        );
-
         const actList = document.createElement("div");
         actList.style.marginTop = "10px";
-        todaysActivities.forEach(a => {
-            const aEl = document.createElement("div");
-            aEl.style.fontSize = "15px";
-            aEl.style.margin = "4px 0";
-            
-            const transportIcon = a.isTransport ? ' 🚗' : '';
-            const repeatIcon = a.repeatWeekly ? ' 🔁' : '';
-            
-            aEl.textContent = `${a.time || ""} ${a.title}${transportIcon}${repeatIcon}`;
-            actList.appendChild(aEl);
+
+        activities.forEach(a => {
+            const isMatch = !a.isPermanent && (a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === selectedDay));
+            if (isMatch) {
+                const aEl = document.createElement("div");
+                aEl.style.fontSize = "15px";
+                aEl.textContent = `${a.time || ""} ${a.title}${a.isTransport ? ' 🚗' : ''}${a.repeatWeekly ? ' 🔁' : ''}`;
+                actList.appendChild(aEl);
+            }
         });
         box.appendChild(actList);
 
-        // 2. הודעות קבועות - סינון מתוקן: מוצגות רק אם תאריך היעד שלהן הוא ביום הנבחר או אחריו
-        const permanentNotes = activities.filter(a => a.isPermanent && a.date >= selectedDate);
-        permanentNotes.forEach(note => {
+        activities.filter(a => a.isPermanent && a.date >= selectedDate).forEach(note => {
             const nDiv = document.createElement("div");
             nDiv.className = "permanent-note";
             nDiv.textContent = `📌 ${note.title}`;
             box.appendChild(nDiv);
         });
 
-        const delKid = document.createElement("span");
-        delKid.className = "delete-kid";
-        delKid.innerHTML = "&times;";
-        delKid.onclick = (e) => { e.stopPropagation(); if(confirm(`למחוק את ${kid.name}?`)) userKidsRef.child(kidId).remove(); };
-        box.appendChild(delKid);
+        const del = document.createElement("span");
+        del.className = "delete-kid";
+        del.innerHTML = "&times;";
+        del.onclick = (e) => { e.stopPropagation(); if(confirm(`למחוק את ${kid.name}?`)) userKidsRef.child(kidId).remove(); };
+        box.appendChild(del);
 
-        kidsContainer.appendChild(box);
+        container.appendChild(box);
     });
 }
 
-// --- מודל וניהול פעילויות ---
 function openKidModal(kidId, kid, activityToEdit = null) {
-    const modalBackdrop = document.getElementById("modalBackdrop");
     const modalContent = document.getElementById("modalContent");
     const modalTitle = document.getElementById("modalTitle");
- 
-    // קביעת הכותרת
-    modalTitle.innerHTML = activityToEdit ? `עריכת פעילות: ${activityToEdit.title}` : kid.name;
-    
-    // ניקוי התוכן הקודם
+    modalTitle.innerHTML = activityToEdit ? `עריכה: ${activityToEdit.title}` : kid.name;
     modalContent.innerHTML = "";
-    modalBackdrop.style.display = "flex";
+    document.getElementById("modalBackdrop").style.display = "flex";
 
     const activities = kid.activities || [];
 
     if (!activityToEdit) {
-        // 1. הוספת כפתור שיתוף כללי בראש הרשימה
         const shareBtn = document.createElement("button");
-        shareBtn.innerHTML = "🔗 שתף את כל הלוח של " + kid.name;
+        shareBtn.innerHTML = "🔗 שתף את כל הלוח";
         shareBtn.style = "margin-bottom:15px; background:#10b981; color:white; border:none; padding:10px; border-radius:8px; cursor:pointer; width:100%; font-weight:bold;";
         shareBtn.onclick = () => shareEntireKid(kidId, kid.name);
         modalContent.appendChild(shareBtn);
 
-        // 2. בניית רשימת הפעילויות
         const list = document.createElement("div");
-        list.className = "activity-list";
-        
         activities.sort((a,b) => a.date.localeCompare(b.date)).forEach(a => {
             const item = document.createElement("div");
             item.className = "activity-item";
-            const repeatSign = a.repeatWeekly ? ' 🔁' : '';
-            const permSign = a.isPermanent ? ' 📌' : '';
-                                    
-            // חישוב תאריך להצגה (סעיף 2 שלך)
+            
             let displayDate = a.date;
-            if (a.repeatWeekly) {
-                displayDate = getNextOccurrence(a.date, todayStr());
-            }
-            const dateFmt = displayDate.split('-').reverse().join('/'); 
+            if (a.repeatWeekly) displayDate = getNextOccurrence(a.date, todayStr());
+            const dateFmt = displayDate.split('-').reverse().join('/');
 
             item.innerHTML = `
-                <span>${dateFmt} | ${a.time || '--:--'} ${a.title}${repeatSign}${permSign}</span>
+                <span>${dateFmt} | ${a.time || '--:--'} ${a.title}${a.repeatWeekly ? ' 🔁' : ''}</span>
                 <div>
-                    <button class="btn-share" onclick="shareActivity('${kid.name}', ${JSON.stringify(a).replace(/"/g, '&quot;')})" style="background:#10b981; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">🔗</button>
-                    <button class="btn-edit" id="edit-${a.id}">✏️</button>
-                    <button class="btn-delete" onclick="deleteActivity('${kidId}', '${a.id}')">🗑️</button>
+                    <button onclick="event.stopPropagation(); shareActivity('${kid.name}', ${JSON.stringify(a).replace(/"/g, '&quot;')})" style="background:#10b981; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">🔗</button>
+                    <button class="btn-edit" onclick="event.stopPropagation(); openKidModal('${kidId}', ${JSON.stringify(kid).replace(/"/g, '&quot;')}, ${JSON.stringify(a).replace(/"/g, '&quot;')})">✏️</button>
+                    <button class="btn-delete" onclick="event.stopPropagation(); deleteActivity('${kidId}', '${a.id}')">🗑️</button>
                 </div>
             `;
-
             list.appendChild(item);
-            // הגדרת כפתור עריכה
-            const editBtn = item.querySelector(`#edit-${a.id}`);
-            if (editBtn) editBtn.onclick = () => openKidModal(kidId, kid, a);
         });
         modalContent.appendChild(list);
     }
 
-    // 3. טופס הוספה/עריכה (נשאר בסוף המודל)
     const form = document.createElement("div");
     form.className = "add-activity-form";
-    const defaultDate = activityToEdit ? activityToEdit.date : todayStr();
-
+    const defDate = activityToEdit ? activityToEdit.date : todayStr();
     form.innerHTML = `
-        <label><strong>${activityToEdit ? 'עדכון פעילות:' : 'הוספת פעילות חדשה:'}</strong></label>
-        <input type="date" id="newActDate" value="${defaultDate}">
+        <input type="date" id="newActDate" value="${defDate}">
         <input type="text" id="newActTitle" placeholder="מה עושים?" value="${activityToEdit ? activityToEdit.title : ''}">
         <input type="time" id="newActTime" value="${activityToEdit ? activityToEdit.time : ''}">
         <label><input type="checkbox" id="newActPerm" ${activityToEdit?.isPermanent ? 'checked' : ''}> הודעה קבועה 📌</label>
-        <label><input type="checkbox" id="newActRepeat" ${activityToEdit?.repeatWeekly ? 'checked' : ''}> חוזר כל שבוע 🔁</label>
+        <label><input type="checkbox" id="newActRepeat" ${activityToEdit?.repeatWeekly ? 'checked' : ''}> חוזר שבועי 🔁</label>
         <label><input type="checkbox" id="newActTrans" ${activityToEdit?.isTransport ? 'checked' : ''}> הסעה 🚗</label>
-        <button id="saveActBtn" style="padding:10px; background:#4CAF50; color:white; border:none; border-radius:4px; cursor:pointer; margin-top:5px;">
-            ${activityToEdit ? 'עדכן עכשיו' : 'שמור פעילות'}
-        </button>
-        ${activityToEdit ? '<button id="cancelEdit" style="background:none; border:none; color:blue; cursor:pointer; margin-top:5px;">ביטול וחזרה</button>' : ''}
+        <button id="saveActBtn" style="padding:10px; background:#4CAF50; color:white; border:none; border-radius:4px; cursor:pointer;">שמור</button>
+        ${activityToEdit ? '<button onclick="openKidModal(\''+kidId+'\', JSON.parse(\''+JSON.stringify(kid).replace(/'/g, "\\'")+'\'))">ביטול</button>' : ''}
     `;
     modalContent.appendChild(form);
-
-    if (activityToEdit) {
-        document.getElementById("cancelEdit").onclick = () => openKidModal(kidId, kid);
-    }
 
     document.getElementById("saveActBtn").onclick = () => {
         const title = document.getElementById("newActTitle").value;
         const date = document.getElementById("newActDate").value;
-        if (!title || !date) return alert("חובה למלא כותרת ותאריך");
+        if (!title || !date) return alert("חובה למלא הכל");
 
-        const newActData = {
+        const newAct = {
             id: activityToEdit ? activityToEdit.id : "a_" + Date.now(),
-            title: title,
-            date: date,
+            title, date,
             time: document.getElementById("newActTime").value || "",
             isPermanent: document.getElementById("newActPerm").checked,
             repeatWeekly: document.getElementById("newActRepeat").checked,
             isTransport: document.getElementById("newActTrans").checked
         };
 
-        let updatedList = activityToEdit ? activities.map(a => a.id === activityToEdit.id ? newActData : a) : [...activities, newActData];
-
-        userKidsRef.child(kidId).child("activities").set(updatedList).then(() => {
-            if (activityToEdit) openKidModal(kidId, kid);
+        const newList = activityToEdit ? activities.map(a => a.id === activityToEdit.id ? newAct : a) : [...activities, newAct];
+        userKidsRef.child(kidId).child("activities").set(newList).then(() => {
+            if (activityToEdit) userKidsRef.child(kidId).once("value", s => openKidModal(kidId, s.val()));
             else document.getElementById("modalBackdrop").style.display = "none";
         });
     };
 }
 
-    function shareActivity(kidName, activity) {
-    // הפיכת פרטי הפעילות לטקסט מוצפן לקישור
-    const activityData = btoa(unescape(encodeURIComponent(JSON.stringify(activity))));
-    const shareUrl = `${window.location.origin}${window.location.pathname}?sharedAct=${activityData}`;
-
-    const shareText = `היי, שלחתי לך פעילות עבור ${kidName}: "${activity.title}" בתאריך ${activity.date}. לחץ כאן להוספה: ${shareUrl}`;
-
-    // שימוש בממשק השיתוף של הטלפון/דפדפן
-    if (navigator.share) {
-        navigator.share({
-            title: 'שיתוף פעילות',
-            text: shareText,
-            url: shareUrl
-        });
-    } else {
-        // גיבוי למחשב - העתקה ללוח
-        navigator.clipboard.writeText(shareText);
-        alert("הקישור הועתק ללוח! שלחי אותו בוואטסאפ.");
-    }
+// --- שיתוף ואירועים ---
+function shareActivity(kidName, a) {
+    const data = btoa(unescape(encodeURIComponent(JSON.stringify(a))));
+    const url = `${window.location.origin}${window.location.pathname}?sharedAct=${data}`;
+    const txt = `פעילות עבור ${kidName}: ${a.title} ב-${a.date}. להוספה: ${url}`;
+    if (navigator.share) navigator.share({ title: 'שיתוף', text: txt, url: url });
+    else { navigator.clipboard.writeText(txt); alert("הועתק ללוח!"); }
 }
-// --- אירועים ---
+
+function shareEntireKid(kidId, kidName) {
+    userKidsRef.child(kidId).once("value", snap => {
+        const data = btoa(unescape(encodeURIComponent(JSON.stringify(snap.val()))));
+        const url = `${window.location.origin}${window.location.pathname}?sharedKid=${data}`;
+        if (navigator.share) navigator.share({ title: kidName, url: url });
+        else { navigator.clipboard.writeText(url); alert("קישור הועתק!"); }
+    });
+}
+
 window.deleteActivity = (kidId, actId) => {
-    if(!confirm("למחוק פעילות זו?")) return;
+    if(!confirm("למחוק?")) return;
     userKidsRef.child(kidId).child("activities").once("value", snap => {
         const filtered = (snap.val() || []).filter(a => a.id !== actId);
         userKidsRef.child(kidId).child("activities").set(filtered).then(() => {
@@ -290,98 +267,47 @@ window.deleteActivity = (kidId, actId) => {
     });
 };
 
-// כפתור הרענון מפעיל את ה-Render מחדש עם התאריך שנבחר
-document.getElementById("refreshBtn").onclick = () => {
-    userKidsRef.once("value", snap => renderKids(snap.val()));
-};
-
-userKidsRef.on("value", snapshot => renderKids(snapshot.val()));
-
 document.getElementById("addKidBtn").onclick = () => {
     const name = prompt("שם הילד:");
-    if (name) {
-        const newKidRef = userKidsRef.push();
-        newKidRef.set({ id: newKidRef.key, name: name, activities: [] });
+    if (name && userKidsRef) {
+        const ref = userKidsRef.push();
+        ref.set({ id: ref.key, name, activities: [] });
     }
 };
 
 document.getElementById("closeModal").onclick = () => document.getElementById("modalBackdrop").style.display = "none";
-function shareEntireKid(kidId, kidName) {
-    // משיכת הנתונים המעודכנים ביותר מ-Firebase
-    userKidsRef.child(kidId).once("value", snap => {
-        const kidData = snap.val();
-        if (!kidData) return;
+document.getElementById("refreshBtn").onclick = () => userKidsRef.once("value", snap => renderKids(snap.val()));
 
-        const dataToShare = {
-            name: kidData.name,
-            activities: kidData.activities || []
-        };
-
-        try {
-            // קידוד הנתונים
-            const encodedData = btoa(unescape(encodeURIComponent(JSON.stringify(dataToShare))));
-            const shareUrl = `${window.location.origin}${window.location.pathname}?sharedKid=${encodedData}`;
-
-            const shareText = `שלחתי לך את לוח הפעילויות של ${kidName}:`;
-
-            if (navigator.share) {
-                navigator.share({
-                    title: `הלוח של ${kidName}`,
-                    text: shareText,
-                    url: shareUrl
-                }).catch(err => console.log("שיתוף בוטל"));
-            } else {
-                navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
-                alert("הקישור הועתק ללוח!");
-            }
-        } catch (e) {
-            alert("חלה שגיאה בהכנת הקישור. וודאי שאין תווים מיוחדים מדי.");
-            console.error(e);
-        }
-    });
-}
-// בדיקה האם יש פעילות משותפת בקישור
+// --- קליטת שיתוף (בטעינה) ---
 window.onload = () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const sharedKidData = urlParams.get('sharedKid');
+    const params = new URLSearchParams(window.location.search);
+    const sk = params.get('sharedKid');
+    const sa = params.get('sharedAct');
 
-    if (sharedKidData) {
-        try {
-            const incomingKid = JSON.parse(decodeURIComponent(escape(atob(sharedKidData))));
+    if (sk || sa) {
+        auth.onAuthStateChanged(user => {
+            if (!user) return alert("אנא התחברי קודם כדי לקבל את המידע.");
             
-            if (confirm(`האם להוסיף את הלוח של ${incomingKid.name} למערכת שלך?`)) {
-                userKidsRef.once("value", snap => {
-                    const kids = snap.val() || {};
-                    // בדיקה אם הילד כבר קיים (לפי שם)
-                    let kidId = Object.keys(kids).find(id => kids[id].name === incomingKid.name);
-                    
-                    if (kidId) {
-                        // הילד קיים - מוסיפים פעילויות חדשות (מונעים כפילויות לפי כותרת ותאריך)
-                        const existingActs = kids[kidId].activities || [];
-                        const newActs = incomingKid.activities.filter(incoming => 
-                            !existingActs.some(existing => existing.title === incoming.title && existing.date === incoming.date)
-                        );
-                        
-                        userKidsRef.child(kidId).child("activities").set([...existingActs, ...newActs]);
-                        alert(`הפעילויות החדשות התווספו ל${incomingKid.name} הקיים.`);
-                    } else {
-                        // הילד לא קיים - יוצרים קובייה חדשה לגמרי!
-                        const newKidRef = userKidsRef.push();
-                        newKidRef.set({
-                            id: newKidRef.key,
-                            name: incomingKid.name,
-                            activities: incomingKid.activities
-                        });
-                        alert(`נוצרה קובייה חדשה עבור ${incomingKid.name} עם כל הפעילויות.`);
-                    }
-                    
-                    // ניקוי הכתובת למעלה
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                });
+            if (sk) {
+                const data = JSON.parse(decodeURIComponent(escape(atob(sk))));
+                if (confirm(`להוסיף את הלוח של ${data.name}?`)) {
+                    const newRef = userKidsRef.push();
+                    newRef.set({...data, id: newRef.key});
+                }
             }
-        } catch (e) {
-            console.error("שגיאה בסנכרון הילד", e);
-        }
+            if (sa) {
+                const act = JSON.parse(decodeURIComponent(escape(atob(sa))));
+                const kName = prompt(`להוסיף "${act.title}" למי?`);
+                if (kName) {
+                    userKidsRef.once("value", snap => {
+                        const kids = snap.val() || {};
+                        let kId = Object.keys(kids).find(id => kids[id].name === kName);
+                        if (kId) userKidsRef.child(kId).child("activities").set([...(kids[kId].activities || []), {...act, id: "a_"+Date.now()}]);
+                    });
+                }
+            }
+            window.history.replaceState({}, '', window.location.pathname);
+        });
     }
 };
 </script>
