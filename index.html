@@ -55,26 +55,33 @@
         <input type="date" id="dateFilter">
         <button id="refreshBtn" style="background:#4CAF50; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer;">🔄 סנן</button>
     </div>
-
-    <div id="family-timeline" style="display:none;">
+<div id="family-timeline" style="display:none; background: #fff; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-right: 5px solid #4CAF50;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
             <h3 style="margin:0;">📅 לו"ז משפחתי</h3>
-            <button id="toggleTimelineBtn" style="background:none; border:none; cursor:pointer; font-size:20px;">➖</button>
-            <div class="view-selector">
-                <button id="viewDaily" class="btn-toggle">יומי</button>
-                <button id="viewWeekly" class="btn-toggle">שבועי</button>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <div class="view-selector">
+                    <button id="viewDaily" class="btn-toggle">יומי</button>
+                    <button id="viewWeekly" class="btn-toggle">שבועי</button>
+                </div>
+                <button id="toggleTimelineBtn" style="background:#eee; border:none; padding:5px 10px; border-radius:5px; cursor:pointer;">➖</button>
             </div>
-           <select id="typeFilter" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc;">
-                <option value="all">הכל (תצוגה מלאה)</option>
-                <option value="transport">רק הסעות 🚗</option>
-                <option value="permanent">רק פתקים קבועים 📌</option>
-                <option value="recurring">רק פעילויות חוזרות 🔁</option>
-                <option value="regular">פעילויות חד-פעמיות</option>
-            </select>
-            <button id="whatsappShareBtn" style="background: #25D366; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: bold;">שתף ב-WhatsApp 🟢</button>
         </div>
-        <div id="timeline-list"></div>
+        
+        <div id="timeline-content-area">
+            <div style="margin-bottom:10px; display:flex; gap:8px;">
+                <select id="typeFilter" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc; flex-grow:1;">
+                    <option value="all">הכל (תצוגה מלאה)</option>
+                    <option value="transport">רק הסעות 🚗</option>
+                    <option value="permanent">רק פתקים קבועים 📌</option>
+                    <option value="recurring">רק פעילויות חוזרות 🔁</option>
+                    <option value="regular">פעילויות חד-פעמיות</option>
+                </select>
+                <button id="whatsappShareBtn" style="background: #25D366; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: bold;">שתף 🟢</button>
+            </div>
+            <div id="timeline-list"></div>
+        </div>
     </div>
+   
     
     <button id="addKidBtn">הוסף חדש</button>
     <div id="kids-container"></div>
