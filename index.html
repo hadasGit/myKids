@@ -59,6 +59,7 @@
     <div id="family-timeline" style="display:none;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
             <h3 style="margin:0;">📅 לו"ז משפחתי</h3>
+            <button id="toggleTimelineBtn" style="background:none; border:none; cursor:pointer; font-size:20px;">➖</button>
             <div class="view-selector">
                 <button id="viewDaily" class="btn-toggle">יומי</button>
                 <button id="viewWeekly" class="btn-toggle">שבועי</button>
@@ -129,7 +130,8 @@ let userSettingsRef = null;
 let currentTimelineView = 'daily';
 let currentFilterType = 'all';
 let appSettings = { title: "הלוח שלי", entityName: "פעילות", defaultView: "daily" };
-
+let isTimelineVisible = true;
+    
 const todayStr = () => new Date().toISOString().slice(0, 10);
 document.getElementById("dateFilter").value = todayStr();
 
@@ -180,7 +182,10 @@ function renderKids(kids) {
     const timelineContainer = document.getElementById("family-timeline");
     container.innerHTML = "";
     timelineList.innerHTML = "";
-    if (!kids) { timelineContainer.style.display = "none"; return; }
+    // תמיד נשאיר את הקונטיינר גלוי (אלא אם אין ילדים בכלל במערכת)
+    timelineContainer.style.display = kids ? "block" : "none";
+
+//    if (!kids) { timelineContainer.style.display = "none"; return; }
 
     const selectedDate = document.getElementById("dateFilter").value;
     const baseDate = new Date(selectedDate);
@@ -254,26 +259,38 @@ function renderKids(kids) {
 
     renderTimelineList(allActivities, timelineList, timelineContainer);
 }
-
-function renderTimelineList(allActivities, timelineList, timelineContainer) {
+// --- עדכון פונקציית רשימת הלו"ז ---
+function renderTimelineList(allActivities, timelineList) {
     if (allActivities.length > 0) {
-        timelineContainer.style.display = "block";
         allActivities.sort((a, b) => a.displayDate.localeCompare(b.displayDate) || (a.time || "99:99").localeCompare(b.time || "99:99"));
-        let lastHeader = "";
+        let lastH = "";
         allActivities.forEach(act => {
-            if (currentTimelineView === 'weekly' && act.displayDate !== lastHeader) {
+            if (currentTimelineView === 'weekly' && act.displayDate !== lastH) {
                 const h = document.createElement("div");
-                h.style = "background:#eee; padding:4px 8px; font-size:12px; font-weight:bold; margin-top:10px; border-radius:4px; border-right: 3px solid #4CAF50;";
+                h.style = "background:#eee; padding:4px; font-weight:bold; margin-top:10px; border-radius:4px;";
                 h.textContent = act.displayDate.split('-').reverse().join('/');
-                timelineList.appendChild(h); lastHeader = act.displayDate;
+                timelineList.appendChild(h); lastH = act.displayDate;
             }
             const item = document.createElement("div");
             item.className = "timeline-item";
             item.innerHTML = `<span class="timeline-time">${act.time || "--:--"}</span><span class="timeline-content"><span class="timeline-kid-name">${act.kidName}</span> ${act.isPermanent ? '📌 ' : ''}${act.title} ${act.isTransport ? '🚗' : ''} ${act.repeatWeekly ? '🔁' : ''}</span>`;
             timelineList.appendChild(item);
         });
-    } else { timelineContainer.style.display = "none"; }
+        document.getElementById("whatsappShareBtn").style.display = "block";
+    } else {
+        timelineList.innerHTML = "<div style='padding:20px; color:#666; text-align:center;'>אין פעילויות להצגה בסינון זה</div>";
+        document.getElementById("whatsappShareBtn").style.display = "none";
+    }
 }
+
+// --- כפתור הסתרה/הצגה של הלו"ז ---
+document.getElementById("toggleTimelineBtn").onclick = function() {
+    isTimelineVisible = !isTimelineVisible;
+    const content = document.getElementById("timeline-content-area");
+    content.style.display = isTimelineVisible ? "block" : "none";
+    this.textContent = isTimelineVisible ? "➖" : "➕";
+};
+
 
 // --- שיתוף (הפונקציות המקוריות שביקשת) ---
 function shareActivity(kidName, a) {
