@@ -181,7 +181,18 @@ function updateUI() {
     document.getElementById("viewDaily").classList.toggle('active', currentTimelineView === 'daily');
     document.getElementById("viewWeekly").classList.toggle('active', currentTimelineView === 'weekly');
 }
-
+// הוספת האירוע לכפתור הכיווץ (שימי לב לשים את זה בתוך auth.onAuthStateChanged או בסוף ה-script)
+function setupToggleBtn() {
+    const btn = document.getElementById("toggleTimelineBtn");
+    const content = document.getElementById("timeline-content-area");
+    if (btn && content) {
+        btn.onclick = () => {
+            isTimelineVisible = !isTimelineVisible;
+            content.style.display = isTimelineVisible ? "block" : "none";
+            btn.textContent = isTimelineVisible ? "➖" : "➕";
+        };
+    }
+}
 // --- רינדור קוביות ולו"ז ---
 function renderKids(kids) {
     const container = document.getElementById("kids-container");
@@ -266,29 +277,42 @@ function renderKids(kids) {
 
     renderTimelineList(allActivities, timelineList, timelineContainer);
 }
-// --- עדכון פונקציית רשימת הלו"ז ---
-function renderTimelineList(allActivities, timelineList) {
+ function renderTimelineList(allActivities, timelineList, timelineContainer) {
+    // במקום להעלים את כל הקונטיינר, אנחנו תמיד מציגים אותו אם יש ילדים
+    timelineContainer.style.display = "block";
+    timelineList.innerHTML = "";
+
     if (allActivities.length > 0) {
         allActivities.sort((a, b) => a.displayDate.localeCompare(b.displayDate) || (a.time || "99:99").localeCompare(b.time || "99:99"));
-        let lastH = "";
+
+        let lastHeader = "";
         allActivities.forEach(act => {
-            if (currentTimelineView === 'weekly' && act.displayDate !== lastH) {
-                const h = document.createElement("div");
-                h.style = "background:#eee; padding:4px; font-weight:bold; margin-top:10px; border-radius:4px;";
-                h.textContent = act.displayDate.split('-').reverse().join('/');
-                timelineList.appendChild(h); lastH = act.displayDate;
+            if (currentTimelineView === 'weekly' && act.displayDate !== lastHeader) {
+                const header = document.createElement("div");
+                header.style = "background:#eee; padding:4px 8px; font-size:12px; font-weight:bold; margin-top:10px; border-radius:4px; border-right: 3px solid #4CAF50;";
+                header.textContent = act.displayDate.split('-').reverse().join('/');
+                timelineList.appendChild(header);
+                lastHeader = act.displayDate;
             }
             const item = document.createElement("div");
             item.className = "timeline-item";
-            item.innerHTML = `<span class="timeline-time">${act.time || "--:--"}</span><span class="timeline-content"><span class="timeline-kid-name">${act.kidName}</span> ${act.isPermanent ? '📌 ' : ''}${act.title} ${act.isTransport ? '🚗' : ''} ${act.repeatWeekly ? '🔁' : ''}</span>`;
+            item.innerHTML = `
+                <span class="timeline-time">${act.time || "--:--"}</span>
+                <span class="timeline-content">
+                    <span class="timeline-kid-name">${act.kidName}</span> 
+                    ${act.isPermanent ? '📌 ' : ''}${act.title} ${act.isTransport ? '🚗' : ''} ${act.repeatWeekly ? '🔁' : ''}
+                </span>`;
             timelineList.appendChild(item);
         });
-        document.getElementById("whatsappShareBtn").style.display = "block";
+        document.getElementById("whatsappShareBtn").style.opacity = "1";
+        document.getElementById("whatsappShareBtn").disabled = false;
     } else {
-        timelineList.innerHTML = "<div style='padding:20px; color:#666; text-align:center;'>אין פעילויות להצגה בסינון זה</div>";
-        document.getElementById("whatsappShareBtn").style.display = "none";
+        // אם אין פעילויות בסינון שנבחר
+        timelineList.innerHTML = "<div style='text-align:center; padding:20px; color:#999;'>אין פעילויות להצגה בסינון זה</div>";
+        document.getElementById("whatsappShareBtn").style.opacity = "0.5";
+        document.getElementById("whatsappShareBtn").disabled = true;
     }
-}
+}   
 
 // --- כפתור הסתרה/הצגה של הלו"ז ---
 document.getElementById("toggleTimelineBtn").onclick = function() {
