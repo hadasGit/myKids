@@ -226,7 +226,11 @@ function setupToggleBtn() {
         };
     }
 }
-
+// פונקציה ליצירת צבע פסטל בהיר אקראי
+function getPastelColor() {
+    const hue = Math.floor(Math.random() * 360);
+    return `hsl(${hue}, 70%, 92%)`;
+}
 // --- רינדור קוביות ולו"ז ---
 function renderKids(kids) {
     const container = document.getElementById("kids-container");
@@ -248,6 +252,10 @@ function renderKids(kids) {
         
         const box = document.createElement("div");
         box.className = "kid-box";
+     // הוספת צבע פסטל רקע
+        box.style.backgroundColor = getPastelColor();
+        box.style.border = "1px solid rgba(0,0,0,0.05)";
+        
         box.onclick = () => openKidModal(kidId, kid);
         
         const nameEl = document.createElement("div");
@@ -426,7 +434,27 @@ function openKidModal(kidId, kid, activityToEdit = null) {
         });
     };
 }
-
+// תיקון פונקציית המחיקה של פעילות בודדת
+window.deleteActivity = (kidId, actId) => {
+    if(!confirm("למחוק את הפעילות?")) return;
+    
+    // מוודא שאנחנו מוחקים מהרשימה המעודכנת ביותר
+    userKidsRef.child(kidId).child("activities").once("value", snap => {
+        const currentActivities = snap.val() || [];
+        const filtered = currentActivities.filter(a => String(a.id) !== String(actId));
+        
+        userKidsRef.child(kidId).child("activities").set(filtered).then(() => {
+            // רענון המודאל עם הנתונים החדשים
+            userKidsRef.child(kidId).once("value", s => {
+                if (s.exists()) {
+                    openKidModal(kidId, s.val());
+                } else {
+                    document.getElementById("modalBackdrop").style.display = "none";
+                }
+            });
+        }).catch(err => console.error("מחיקה נכשלה:", err));
+    });
+};
 // --- אירועי כפתורים ותפריט סינון ---
 document.addEventListener('DOMContentLoaded', () => {
     const filterBtn = document.getElementById("filterDropdownBtn");
