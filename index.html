@@ -69,13 +69,21 @@
         
         <div id="timeline-content-area">
             <div style="margin-bottom:10px; display:flex; gap:8px;">
-                <select id="typeFilter" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc; flex-grow:1;">
-                    <option value="all">הכל (תצוגה מלאה)</option>
-                    <option value="transport">רק הסעות 🚗</option>
-                    <option value="permanent">רק פתקים קבועים 📌</option>
-                    <option value="recurring">רק פעילויות חוזרות 🔁</option>
-                    <option value="regular">פעילויות חד-פעמיות</option>
-                </select>
+               <div id="filter-container" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; background: #f9f9f9; padding: 10px; border-radius: 8px; font-size: 14px;">
+                    <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                        <input type="checkbox" class="filter-check" value="regular" checked> רגיל
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                        <input type="checkbox" class="filter-check" value="transport" checked> הסעה 🚗
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                        <input type="checkbox" class="filter-check" value="recurring" checked> חוזר 🔁
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                        <input type="checkbox" class="filter-check" value="permanent" checked> קבוע 📌
+                    </label>
+                </div>
+              
                 <button id="whatsappShareBtn" style="background: #25D366; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: bold;">שתף 🟢</button>
             </div>
             <div id="timeline-list"></div>
@@ -208,7 +216,8 @@ function renderKids(kids) {
     const selectedDate = document.getElementById("dateFilter").value;
     const baseDate = new Date(selectedDate);
     let allActivities = [];
-
+    let activeFilters = ['regular', 'transport', 'recurring', 'permanent'];
+    
     Object.keys(kids).forEach(kidId => {
         const kid = kids[kidId];
         const activities = kid.activities || [];
@@ -245,10 +254,25 @@ function renderKids(kids) {
             }
 
             // 3. איסוף ללו"ז המשפחתי (עם סינון תאריך להודעות קבועות)
-            if (currentFilterType === 'transport' && !a.isTransport) return;
-            if (currentFilterType === 'permanent' && !a.isPermanent) return;
-            if (currentFilterType === 'recurring' && !a.repeatWeekly) return;
-            if (currentFilterType === 'regular' && (a.isTransport || a.isPermanent || a.repeatWeekly)) return;
+
+            // --- לוגיקת סינון רב-בחירה ---
+const isTransport = a.isTransport;
+const isRecurring = a.repeatWeekly;
+const isPermanent = a.isPermanent;
+const isRegular = !isTransport && !isRecurring && !isPermanent;
+
+let shouldShow = false;
+if (isRegular && activeFilters.includes('regular')) shouldShow = true;
+if (isTransport && activeFilters.includes('transport')) shouldShow = true;
+if (isRecurring && activeFilters.includes('recurring')) shouldShow = true;
+if (isPermanent && activeFilters.includes('permanent')) shouldShow = true;
+
+if (!shouldShow) return; // אם הפעילות לא עונה לאף אחד מהסינונים המסומנים - דלג
+            
+            //if (currentFilterType === 'transport' && !a.isTransport) return;
+            //if (currentFilterType === 'permanent' && !a.isPermanent) return;
+            //if (currentFilterType === 'recurring' && !a.repeatWeekly) return;
+            //if (currentFilterType === 'regular' && (a.isTransport || a.isPermanent || a.repeatWeekly)) return;
 
             const checkTimelineMatch = (dStr) => {
                 const d = new Date(dStr);
@@ -451,7 +475,14 @@ window.deleteActivity = (kidId, actId) => {
 
 document.getElementById("viewDaily").onclick = () => { currentTimelineView = 'daily'; updateUI(); userKidsRef.once("value", s => renderKids(s.val())); };
 document.getElementById("viewWeekly").onclick = () => { currentTimelineView = 'weekly'; updateUI(); userKidsRef.once("value", s => renderKids(s.val())); };
-document.getElementById("typeFilter").onchange = (e) => { currentFilterType = e.target.value; userKidsRef.once("value", s => renderKids(s.val())); };
+//document.getElementById("typeFilter").onchange = (e) => { currentFilterType = e.target.value; userKidsRef.once("value", s => renderKids(s.val())); };
+    // עדכון סינונים בלחיצה על צ'קבוקס
+document.querySelectorAll('.filter-check').forEach(checkbox => {
+    checkbox.onchange = () => {
+        activeFilters = Array.from(document.querySelectorAll('.filter-check:checked')).map(cb => cb.value);
+        userKidsRef.once("value", s => renderKids(s.val()));
+    };
+});
 document.getElementById("refreshBtn").onclick = () => userKidsRef.once("value", snap => renderKids(snap.val()));
 document.getElementById("closeModal").onclick = () => document.getElementById("modalBackdrop").style.display = "none";
 document.getElementById("loginBtn").onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
