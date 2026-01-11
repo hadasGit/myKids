@@ -282,11 +282,7 @@ function renderKids(kids) {
             //if (currentFilterType === 'recurring' && !a.repeatWeekly) return;
             //if (currentFilterType === 'regular' && (a.isTransport || a.isPermanent || a.repeatWeekly)) return;
 
-            const checkTimelineMatch = (dStr) => {
-                const d = new Date(dStr);
-                if (a.isPermanent) return a.date === dStr; // בלו"ז רק בתאריך המקורי
-                return a.date === dStr || (a.repeatWeekly && new Date(a.date).getDay() === d.getDay());
-            };
+         
 
            
         });
