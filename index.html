@@ -68,24 +68,24 @@
         </div>
         
         <div id="timeline-content-area">
-            <div style="margin-bottom:10px; display:flex; gap:8px;">
-               <div id="filter-container" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; background: #f9f9f9; padding: 10px; border-radius: 8px; font-size: 14px;">
-                    <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
-                        <input type="checkbox" class="filter-check" value="regular" checked> רגיל
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
-                        <input type="checkbox" class="filter-check" value="transport" checked> הסעה 🚗
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
-                        <input type="checkbox" class="filter-check" value="recurring" checked> חוזר 🔁
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
-                        <input type="checkbox" class="filter-check" value="permanent" checked> קבוע 📌
-                    </label>
-                </div>
-              
-                <button id="whatsappShareBtn" style="background: #25D366; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: bold;">שתף 🟢</button>
-            </div>
+          //  <div style="margin-bottom:10px; display:flex; gap:8px;">
+              <div style="margin-bottom:10px; display:flex; gap:8px; position: relative;">
+    <div style="position: relative; flex-grow: 1;">
+        <button id="filterDropdownBtn" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ccc; background: white; text-align: right; cursor: pointer;">
+             🔍 סנן לפי סוג...
+        </button>
+        
+        <div id="filterMenu" style="display: none; position: absolute; top: 100%; right: 0; left: 0; background: white; border: 1px solid #ccc; border-radius: 6px; padding: 10px; z-index: 100; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+            <label style="display: block; margin-bottom: 8px; cursor: pointer;"><input type="checkbox" class="filter-check" value="regular" checked> פעילויות רגילות</label>
+            <label style="display: block; margin-bottom: 8px; cursor: pointer;"><input type="checkbox" class="filter-check" value="transport" checked> הסעות 🚗</label>
+            <label style="display: block; margin-bottom: 8px; cursor: pointer;"><input type="checkbox" class="filter-check" value="recurring" checked> פעילויות חוזרות 🔁</label>
+            <label style="display: block; margin-bottom: 8px; cursor: pointer;"><input type="checkbox" class="filter-check" value="permanent" checked> פתקים קבועים 📌</label>
+        </div>
+    </div>
+    
+    <button id="whatsappShareBtn" style="background: #25D366; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: bold;">שתף 🟢</button>
+</div>
+               
             <div id="timeline-list"></div>
         </div>
     </div>
@@ -254,29 +254,15 @@ function renderKids(kids) {
             }
 
             // 3. איסוף ללו"ז המשפחתי (עם סינון תאריך להודעות קבועות)
-
-            // --- לוגיקת סינון רב-בחירה ---
-const isTransport = a.isTransport;
-const isRecurring = a.repeatWeekly;
-const isPermanent = a.isPermanent;
-const isRegular = !isTransport && !isRecurring && !isPermanent;
-
-let shouldShow = false;
-if (isRegular && activeFilters.includes('regular')) shouldShow = true;
-if (isTransport && activeFilters.includes('transport')) shouldShow = true;
-if (isRecurring && activeFilters.includes('recurring')) shouldShow = true;
-if (isPermanent && activeFilters.includes('permanent')) shouldShow = true;
-
-if (!shouldShow) return; // אם הפעילות לא עונה לאף אחד מהסינונים המסומנים - דלג
+// לוגיקת הסינון ללו"ז המרוכז
+            const type = a.isTransport ? 'transport' : (a.repeatWeekly ? 'recurring' : (a.isPermanent ? 'permanent' : 'regular'));
             
-            //if (currentFilterType === 'transport' && !a.isTransport) return;
-            //if (currentFilterType === 'permanent' && !a.isPermanent) return;
-            //if (currentFilterType === 'recurring' && !a.repeatWeekly) return;
-            //if (currentFilterType === 'regular' && (a.isTransport || a.isPermanent || a.repeatWeekly)) return;
+            // בדיקה אם סוג הפעילות נמצא ברשימת המסוננים
+            if (!activeFilters.includes(type)) return;
 
             const checkTimelineMatch = (dStr) => {
                 const d = new Date(dStr);
-                if (a.isPermanent) return a.date === dStr; // בלו"ז רק בתאריך המקורי
+                if (a.isPermanent) return a.date === dStr;
                 return a.date === dStr || (a.repeatWeekly && new Date(a.date).getDay() === d.getDay());
             };
 
@@ -289,6 +275,20 @@ if (!shouldShow) return; // אם הפעילות לא עונה לאף אחד מה
                     if (checkTimelineMatch(ts)) allActivities.push({ ...a, kidName: kid.name, displayDate: ts });
                 }
             }
+            // --- לוגיקת סינון רב-בחירה ---
+
+            //if (currentFilterType === 'transport' && !a.isTransport) return;
+            //if (currentFilterType === 'permanent' && !a.isPermanent) return;
+            //if (currentFilterType === 'recurring' && !a.repeatWeekly) return;
+            //if (currentFilterType === 'regular' && (a.isTransport || a.isPermanent || a.repeatWeekly)) return;
+
+            const checkTimelineMatch = (dStr) => {
+                const d = new Date(dStr);
+                if (a.isPermanent) return a.date === dStr; // בלו"ז רק בתאריך המקורי
+                return a.date === dStr || (a.repeatWeekly && new Date(a.date).getDay() === d.getDay());
+            };
+
+           
         });
 
         box.appendChild(actList);
@@ -476,13 +476,30 @@ window.deleteActivity = (kidId, actId) => {
 document.getElementById("viewDaily").onclick = () => { currentTimelineView = 'daily'; updateUI(); userKidsRef.once("value", s => renderKids(s.val())); };
 document.getElementById("viewWeekly").onclick = () => { currentTimelineView = 'weekly'; updateUI(); userKidsRef.once("value", s => renderKids(s.val())); };
 //document.getElementById("typeFilter").onchange = (e) => { currentFilterType = e.target.value; userKidsRef.once("value", s => renderKids(s.val())); };
-    // עדכון סינונים בלחיצה על צ'קבוקס
-document.querySelectorAll('.filter-check').forEach(checkbox => {
-    checkbox.onchange = () => {
-        activeFilters = Array.from(document.querySelectorAll('.filter-check:checked')).map(cb => cb.value);
-        userKidsRef.once("value", s => renderKids(s.val()));
+  // ניהול תפריט הסינון והצ'קבוקסים
+document.addEventListener('DOMContentLoaded', () => {
+    const filterBtn = document.getElementById("filterDropdownBtn");
+    const filterMenu = document.getElementById("filterMenu");
+
+    // פתיחה/סגירה של התפריט
+    filterBtn.onclick = (e) => {
+        e.stopPropagation();
+        filterMenu.style.display = filterMenu.style.display === "none" ? "block" : "none";
     };
+
+    // סגירת התפריט בלחיצה בחוץ
+    document.onclick = () => filterMenu.style.display = "none";
+    filterMenu.onclick = (e) => e.stopPropagation();
+
+    // עדכון סינונים כשלוחצים על צ'קבוקס
+    document.querySelectorAll('.filter-check').forEach(checkbox => {
+        checkbox.onchange = () => {
+            activeFilters = Array.from(document.querySelectorAll('.filter-check:checked')).map(cb => cb.value);
+            userKidsRef.once("value", s => renderKids(s.val()));
+        };
+    });
 });
+
 document.getElementById("refreshBtn").onclick = () => userKidsRef.once("value", snap => renderKids(snap.val()));
 document.getElementById("closeModal").onclick = () => document.getElementById("modalBackdrop").style.display = "none";
 document.getElementById("loginBtn").onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
