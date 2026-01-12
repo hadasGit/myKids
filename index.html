@@ -79,7 +79,7 @@
         <input type="date" id="dateFilter">
         <button id="refreshBtn" style="background:#4CAF50; color:white; border:none; padding:8px 12px; border-radius:6px; cursor:pointer;">🔄 סנן</button>
     </div>
-<div id="family-timeline" style="display:none; background: #fff; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-right: 5px solid #4CAF50;">
+<div id="family-line" style="display:none; background: #fff; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-right: 5px solid #4CAF50;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: nowrap; gap: 5px;">
         <h3 style="margin:0; white-space: nowrap;">📅 לו"ז משפחתי</h3>
         
@@ -411,10 +411,14 @@ function openKidModal(kidId, kid, activityToEdit = null) {
     form.innerHTML = `
         <input type="date" id="newActDate" value="${dDate}">
         <input type="text" id="newActTitle" placeholder="מה עושים?" value="${activityToEdit ? activityToEdit.title : ''}">
-       <div style="display: flex; gap: 10px;">
-            <label style="flex: 1; font-size: 12px;">משעה: <input type="time" id="newActTime" style="width:100%" value="${activityToEdit ? activityToEdit.time : ''}"></label>
-            <label style="flex: 1; font-size: 12px;">עד שעה: <input type="time" id="newActEndTime" style="width:100%" value="${activityToEdit ? activityToEdit.endTime : ''}"></label>
-        </div>//<input type="time" id="newActTime" value="${activityToEdit ? activityToEdit.time : ''}">
+         <div style="display: flex; align-items: center; gap: 5px; font-size: 12px;">
+            <span>משעה:</span>
+            <input type="time" id="newActTime" style="width: auto;" value="${activityToEdit ? activityToEdit.time : ''}">
+            <span>-</span>
+            <span>עד שעה:</span>
+            <input type="time" id="newActEndTime" style="width: auto;" value="${activityToEdit ? activityToEdit.endTime : ''}">
+         </div>
+       
         <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; font-size:12px; margin-top:5px;">
             <label><input type="checkbox" id="newActPerm" ${activityToEdit?.isPermanent ? 'checked' : ''}> קבוע</label>
             <label><input type="checkbox" id="newActRepeat" ${activityToEdit?.repeatWeekly ? 'checked' : ''}> חוזר</label>
