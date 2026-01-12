@@ -15,7 +15,13 @@
         
         #family-timeline { background: #fff; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-right: 5px solid #4CAF50; }
         .timeline-item { display: flex; align-items: center; padding: 8px 0; border-bottom: 1px dashed #eee; }
-        .timeline-time { font-weight: bold; width: 60px; color: #4CAF50; }
+        .timeline-time {
+            white-space: nowrap; /* מונע שבירת שורה */
+            display: inline-block; /* מבטיח שהאלמנט יתנהג כיחידה אחת */
+            color: #4caf50; /* הצבע הירוק שמופיע בתמונה שלך */
+            direction: ltr; /* מבטיח שהשעה תוצג משמאל לימין גם בעברית (למשל 17:00-19:00) */
+            font-weight: bold;
+        }
         .timeline-content { flex-grow: 1; }
         .timeline-kid-name { font-size: 0.8rem; background: #e2e8f0; padding: 2px 6px; border-radius: 4px; margin-left: 8px; }
 
