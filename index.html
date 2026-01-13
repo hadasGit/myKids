@@ -271,10 +271,23 @@ function renderKids(kids) {
         box.appendChild(nameEl);
 
         const actList = document.createElement("div");
-        
         activities.forEach(a => {
-            const isMatch = a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === baseDate.getDay());
-            
+            // 1. בדיקה אם הפעילות פגה (עבר זמנה ביחס להיום)
+            const todayStr = new Date().toISOString().slice(0, 10);
+            if (a.isPermanent && a.date < todayStr) {
+                // מחיקה אוטומטית מה-Firebase אם עבר התאריך
+                userKidsRef.child(kidId).child('activities').child(a.id).remove(); 
+                return; // מפסיק את הרינדור של הפעילות הזו
+            }
+        
+            // 2. תנאי הצגה: האם התאריך שנבחר במערכת הוא אחרי תאריך הפעילות הקבועה?
+            // אם זו פעילות קבועה (📌) והתאריך שנבחר בלוח השנה גדול מתאריך הפעילות - היא לא תוצג
+            if (a.isPermanent && selectedDate > a.date) {
+                return; // לא מציגים בלו"ז המשפחתי או בקוביות
+            }
+
+           const isMatch = a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === baseDate.getDay());
+        
             // הצגה בקוביות האישיות (תמיד מציג הכל לפי תאריך)
             if (!a.isPermanent && isMatch) {
                 const aEl = document.createElement("div");
@@ -339,13 +352,24 @@ function renderTimelineList(allActivities, timelineList, timelineContainer) {
                 timelineList.appendChild(header);
                 lastHeader = act.displayDate;
             }
+           
+            // לוגיקת האייקון של הרכב
+            let transportHtml = "";
+            if (act.isTransport) {
+                const isReturn = act.isReturn; // המשתנה החדש מה-Firebase
+                const style = isReturn 
+                    ? "display: inline-block; transform: scaleX(-1); filter: hue-rotate(150deg); drop-shadow(0 0 2px orange);" 
+                    : "display: inline-block;";
+                
+                transportHtml = `<span style="${style}" title="${isReturn ? 'חזור' : 'הלוך'}">🚗</span>`;
+            }
             const item = document.createElement("div");
             item.className = "timeline-item";
             item.innerHTML = `
                 <span class="timeline-time">${formatTimeRange(act.time, act.endTime)}</span>
                 <span class="timeline-content">
                     <span class="timeline-kid-name">${act.kidName}</span> 
-                    ${act.isPermanent ? '📌 ' : ''}${act.title} ${act.isTransport ? '🚗' : ''} ${act.repeatWeekly ? '🔁' : ''}
+                    ${act.isPermanent ? '📌 ' : ''}${act.title} ${transportHtml} ${act.repeatWeekly ? '🔁' : ''}
                 </span>`;
             timelineList.appendChild(item);
         });
@@ -428,7 +452,13 @@ function openKidModal(kidId, kid, activityToEdit = null) {
         <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; font-size:12px; margin-top:5px;">
             <label><input type="checkbox" id="newActPerm" ${activityToEdit?.isPermanent ? 'checked' : ''}> קבוע</label>
             <label><input type="checkbox" id="newActRepeat" ${activityToEdit?.repeatWeekly ? 'checked' : ''}> חוזר</label>
-            <label><input type="checkbox" id="newActTrans" ${activityToEdit?.isTransport ? 'checked' : ''}> הסעה</label>
+            <label><input type="checkbox" id="newActTrans"  onchange="document.getElementById('returnOption').style.display = this.checked ? 'block' : 'none'" ${activityToEdit?.isTransport ? 'checked' : ''}> הסעה 🚗</label>
+        </div>
+  
+        <div id="returnOption" style="display: ${activityToEdit?.isTransport ? 'block' : 'none'}; margin-top: 5px; font-size: 12px; border-top: 1px dotted #ccc; pt: 5px;">
+            <label style="color: #e67e22;">
+                <input type="checkbox" id="newActIsReturn" ${activityToEdit?.isReturn ? 'checked' : ''}> האם זו הסעה חזור? (הביתה) 🏠
+            </label>
         </div>
         <button id="saveActBtn" style="margin-top:10px; padding:10px; background:#4CAF50; color:white; border:none; border-radius:6px; cursor:pointer;">שמור</button>
     `;
@@ -446,7 +476,8 @@ function openKidModal(kidId, kid, activityToEdit = null) {
             endTime: document.getElementById("newActEndTime").value || "", // שדה חדש
             isPermanent: document.getElementById("newActPerm").checked,
             repeatWeekly: document.getElementById("newActRepeat").checked,
-            isTransport: document.getElementById("newActTrans").checked
+            isTransport: document.getElementById("newActTrans").checked,
+            isReturn: document.getElementById("newActIsReturn").checked
         };
        
         const newList = activityToEdit ? activities.map(a => a.id === activityToEdit.id ? newAct : a) : [...activities, newAct];
