@@ -9,13 +9,33 @@ const firebaseConfig = {
   messagingSenderId: "869870400492",
   appId: "1:869870400492:web:80200b8102afb53e1c06c9",
   measurementId: "G-Q3X18J3SJ4",
-  databaseURL: "https://mykids-3f832-default-rtdb.firebaseio.com"
+  databaseURL:  "https://mykids-3f832-default-rtdb.firebaseio.com"
 };
 
 // Initialize Firebase
-if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+let app;
+if (!firebase.apps.length) {
+    app = firebase.initializeApp(firebaseConfig);
+    console.log('Firebase initialized successfully');
+} else {
+    app = firebase.app();
+    console.log('Firebase already initialized');
+}
+
 const db = firebase.database();
 const auth = firebase.auth();
+
+// Configure Google Auth Provider
+const googleProvider = new firebase.auth.GoogleAuthProvider();
+googleProvider.addScope('email');
+googleProvider.addScope('profile');
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
+
+console.log('Firebase Auth:', auth);
+console.log('Firebase Database:', db);
+console.log('Google Auth Provider:', googleProvider);
 
 // Global Variables
 let userKidsRef = null;
@@ -28,8 +48,18 @@ let isTimelineVisible = true;
 // Utility Functions
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
-// Initialize date filter
-document.getElementById("dateFilter").value = todayStr();
+// Initialize date filter - wrap in try-catch
+try {
+    const dateFilter = document.getElementById("dateFilter");
+    if (dateFilter) {
+        dateFilter.value = todayStr();
+        console.log('Date filter initialized successfully');
+    } else {
+        console.error('Date filter element not found');
+    }
+} catch (error) {
+    console.error('Error initializing date filter:', error);
+}
 
 // Show loading states
 function showLoading(element) {
@@ -85,12 +115,15 @@ document.head.appendChild(style);
 
 // Authentication State Management
 auth.onAuthStateChanged(user => {
+    console.log('Auth state changed:', user);
     const authSection = document.getElementById("auth-section");
     showLoading(authSection);
     
     if (user) {
+        console.log('User is signed in:', user.displayName, user.email);
         document.getElementById("user-status").textContent = `שלום, ${user.displayName}`;
         document.getElementById("loginBtn").style.display = "none";
+        document.getElementById("redirectLoginBtn").style.display = "none";
         document.getElementById("logoutBtn").style.display = "inline-flex";
         document.getElementById("settingsBtn").style.display = "flex";
         document.getElementById("main-content").style.display = "block";
@@ -116,32 +149,24 @@ auth.onAuthStateChanged(user => {
         setupToggleBtn();
         showNotification('התחברת בהצלחה!', 'success');
     } else {
+        console.log('User is signed out');
         document.getElementById("user-status").textContent = "אנא התחברי לצפייה בנתונים";
         document.getElementById("loginBtn").style.display = "inline-flex";
         document.getElementById("logoutBtn").style.display = "none";
         document.getElementById("settingsBtn").style.display = "none";
         document.getElementById("main-content").style.display = "none";
+        
+        // Hide redirect button by default
+        const redirectLoginBtn = document.getElementById("redirectLoginBtn");
+        if (redirectLoginBtn) {
+            redirectLoginBtn.style.display = "none";
+        }
+        
         userKidsRef = null;
         hideLoading(authSection);
     }
 });
-                updateUI();
-            }
-        });
 
-        userKidsRef = db.ref(`users/${user.uid}/kids`);
-        userKidsRef.on("value", snapshot => renderKids(snapshot.val()));
-        setupToggleBtn();
-    } else {
-        document.getElementById("user-status").textContent = "אנא התחברי לצפייה בנתונים";
-        document.getElementById("loginBtn").style.display = "inline-block";
-        document.getElementById("logoutBtn").style.display = "none";
-        document.getElementById("main-content").style.display = "none";
-        userKidsRef = null;
-    }
-});
-
-// UI Update Functions
 function updateUI() {
     document.getElementById("app-title").textContent = appSettings.title;
     document.getElementById("page-title").textContent = appSettings.title;
@@ -460,83 +485,213 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// Button Event Handlers
+
+
+// Wait for DOM to be ready before attaching event handlers
+window.addEventListener('load', function() {
+    console.log('Window loaded, attaching login handler...');
+    
+    const loginBtn = document.getElementById("loginBtn");
+    const redirectLoginBtn = document.getElementById("redirectLoginBtn");
+    console.log('Login button element:', loginBtn);
+    console.log('Redirect login button element:', redirectLoginBtn);
+    
+    if (loginBtn) {
+        loginBtn.onclick = async (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            console.log('Login button clicked!');
+            
+            // Prevent multiple clicks
+            if (loginBtn.disabled) {
+                return;
+            }
+            
+            // Remove focus to prevent "focus locked" message
+            loginBtn.blur();
+            
+            try {
+                showLoading(loginBtn);
+                loginBtn.disabled = true;
+                
+                // Use signInWithPopup with the configured provider
+                const result = await auth.signInWithPopup(googleProvider);
+                console.log('Login successful:', result.user);
+                
+                hideLoading(loginBtn);
+                loginBtn.disabled = false;
+                showNotification(`ברוך הבא ${result.user.displayName}!`, "success");
+                
+            } catch (error) {
+                console.error('Login error:', error);
+                hideLoading(loginBtn);
+                loginBtn.disabled = false;
+                
+                // Handle specific error codes
+                if (error.code === 'auth/popup-closed-by-user') {
+                    showNotification("ההתחברות בוטלה על ידי המשתמש", "error");
+                } else if (error.code === 'auth/popup-blocked') {
+                    showNotification("הדפדפן חסם את חלון ההתחברות. נסה את כפתור 'התחברות בדף חדש'", "error");
+                    // Show redirect button as alternative
+                    if (redirectLoginBtn) {
+                        redirectLoginBtn.style.display = "inline-flex";
+                    }
+                } else if (error.code === 'auth/cancelled-popup-request') {
+                    // Multiple popups, ignore this one
+                    return;
+                } else if (error.code === 'auth/unauthorized-domain') {
+                    showNotification("הדומיין לא מורשה. אנא צור קשר עם המפתח.", "error");
+                } else {
+                    showNotification("שגיאה בהתחברות: " + error.message, "error");
+                    // Show redirect button as alternative
+                    if (redirectLoginBtn) {
+                        redirectLoginBtn.style.display = "inline-flex";
+                    }
+                }
+            }
+        };
+        console.log('Login handler attached successfully');
+    } else {
+        console.error('Login button not found!');
+    }
+    
+    // Redirect login button handler
+    if (redirectLoginBtn) {
+        redirectLoginBtn.onclick = () => {
+            console.log('Redirect login button clicked!');
+            tryRedirectSignIn();
+        };
+    }
+});
+
+// Alternative method - try redirect if popup doesn't work
+function tryRedirectSignIn() {
+    console.log('Trying redirect sign-in...');
+    auth.signInWithRedirect(googleProvider);
+}
+
+// Handle redirect result on page load
+auth.getRedirectResult().then((result) => {
+    if (result.user) {
+        console.log('Redirect login successful:', result.user);
+        showNotification(`ברוך הבא ${result.user.displayName}!`, "success");
+    }
+}).catch((error) => {
+    console.error('Redirect login error:', error);
+});
+
+
+
+// Event Listeners for UI controls
 document.getElementById("viewDaily").onclick = () => { 
     currentTimelineView = 'daily'; 
     updateUI(); 
-    userKidsRef.once("value", s => renderKids(s.val())); 
+    if (userKidsRef) userKidsRef.once("value", s => renderKids(s.val())); 
 };
 
 document.getElementById("viewWeekly").onclick = () => { 
     currentTimelineView = 'weekly'; 
     updateUI(); 
-    userKidsRef.once("value", s => renderKids(s.val())); 
+    if (userKidsRef) userKidsRef.once("value", s => renderKids(s.val())); 
 };
 
-document.getElementById("refreshBtn").onclick = () => 
-    userKidsRef.once("value", snap => renderKids(snap.val()));
+document.getElementById("refreshBtn").onclick = () => {
+    if (userKidsRef) userKidsRef.once("value", snap => renderKids(snap.val()));
+};
 
 document.getElementById("closeModal").onclick = () => 
     document.getElementById("modalBackdrop").style.display = "none";
 
-document.getElementById("loginBtn").onclick = () => 
-    auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
-
-document.getElementById("logoutBtn").onclick = () => auth.signOut();
-
-document.getElementById("addKidBtn").onclick = () => {
-    const name = prompt(`שם ה${appSettings.entityName}:`);
-    if (name && userKidsRef) {
-        const ref = userKidsRef.push();
-        ref.set({ id: ref.key, name, activities: [] });
+// Logout button handler
+window.addEventListener('load', function() {
+    const logoutBtn = document.getElementById("logoutBtn");
+    if (logoutBtn) {
+        logoutBtn.onclick = () => {
+            showLoading(logoutBtn);
+            logoutBtn.disabled = true;
+            
+            auth.signOut()
+                .then(() => {
+                    console.log('Logout successful');
+                    hideLoading(logoutBtn);
+                    logoutBtn.disabled = false;
+                    showNotification("התנתקת בהצלחה", "success");
+                })
+                .catch((error) => {
+                    console.error('Logout error:', error);
+                    hideLoading(logoutBtn);
+                    logoutBtn.disabled = false;
+                    showNotification("שגיאה בהתנתקות", "error");
+                });
+        };
     }
-};
-
-document.getElementById("whatsappShareBtn").onclick = () => {
-    const items = document.querySelectorAll(".timeline-item");
-    if (items.length === 0) {
-        showNotification("אין פעילויות לשיתוף", "error");
-        return;
-    }
-    let msg = `*📅 לו"ז ${appSettings.title}:*\n`;
-    Array.from(document.getElementById("timeline-list").children).forEach(el => {
-        if (el.style.fontWeight === "bold") msg += `\n*${el.textContent}*\n`;
-        else msg += `⏰ ${el.querySelector(".timeline-time").textContent} - ${el.querySelector(".timeline-content").textContent.trim()}\n`;
-    });
-    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
-    showNotification("נפתח בוואטסאפ!", "success");
-};
-
-// Settings functionality
-document.getElementById("settingsBtn").onclick = () => {
-    document.getElementById("settingsTitle").value = appSettings.title || "הלוח שלי";
-    document.getElementById("settingsEntityName").value = appSettings.entityName || "פעילויות";
-    document.getElementById("settingsDefaultView").value = appSettings.defaultView || "daily";
-    document.getElementById("settingsModalBackdrop").style.display = "flex";
-};
-
-document.getElementById("saveSettingsBtn").onclick = () => {
-    const newSettings = {
-        title: document.getElementById("settingsTitle").value || "הלוח שלי",
-        entityName: document.getElementById("settingsEntityName").value || "פעילויות",
-        defaultView: document.getElementById("settingsDefaultView").value || "daily"
-    };
     
-    if (userSettingsRef) {
-        showLoading(document.getElementById("saveSettingsBtn"));
-        userSettingsRef.set(newSettings).then(() => {
-            appSettings = newSettings;
-            updateUI();
-            document.getElementById("settingsModalBackdrop").style.display = "none";
-            hideLoading(document.getElementById("saveSettingsBtn"));
-            showNotification("הגדרות נשמרו בהצלחה!", "success");
-        }).catch(error => {
-            hideLoading(document.getElementById("saveSettingsBtn"));
-            showNotification("שגיאה בשמירת הגדרות", "error");
-            console.error("Error saving settings:", error);
-        });
+    const addKidBtn = document.getElementById("addKidBtn");
+    if (addKidBtn) {
+        addKidBtn.onclick = () => {
+            const name = prompt(`שם ה${appSettings.entityName}:`);
+            if (name && userKidsRef) {
+                const ref = userKidsRef.push();
+                ref.set({ id: ref.key, name, activities: [] });
+            }
+        };
     }
-};
+    
+    const whatsappShareBtn = document.getElementById("whatsappShareBtn");
+    if (whatsappShareBtn) {
+        whatsappShareBtn.onclick = () => {
+            const items = document.querySelectorAll(".timeline-item");
+            if (items.length === 0) {
+                showNotification("אין פעילויות לשיתוף", "error");
+                return;
+            }
+            let msg = `*📅 לו"ז ${appSettings.title}:*\n`;
+            Array.from(document.getElementById("timeline-list").children).forEach(el => {
+                if (el.style.fontWeight === "bold") msg += `\n*${el.textContent}*\n`;
+                else msg += `⏰ ${el.querySelector(".timeline-time").textContent} - ${el.querySelector(".timeline-content").textContent.trim()}\n`;
+            });
+            window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
+            showNotification("נפתח בוואטסאפ!", "success");
+        };
+    }
+    
+    // Settings functionality
+    const settingsBtn = document.getElementById("settingsBtn");
+    if (settingsBtn) {
+        settingsBtn.onclick = () => {
+            document.getElementById("settingsTitle").value = appSettings.title || "הלוח שלי";
+            document.getElementById("settingsEntityName").value = appSettings.entityName || "פעילויות";
+            document.getElementById("settingsDefaultView").value = appSettings.defaultView || "daily";
+            document.getElementById("settingsModalBackdrop").style.display = "flex";
+        };
+    }
+    
+    const saveSettingsBtn = document.getElementById("saveSettingsBtn");
+    if (saveSettingsBtn) {
+        saveSettingsBtn.onclick = () => {
+            const newSettings = {
+                title: document.getElementById("settingsTitle").value || "הלוח שלי",
+                entityName: document.getElementById("settingsEntityName").value || "פעילויות",
+                defaultView: document.getElementById("settingsDefaultView").value || "daily"
+            };
+            
+            if (userSettingsRef) {
+                showLoading(saveSettingsBtn);
+                userSettingsRef.set(newSettings).then(() => {
+                    appSettings = newSettings;
+                    updateUI();
+                    document.getElementById("settingsModalBackdrop").style.display = "none";
+                    hideLoading(saveSettingsBtn);
+                    showNotification("הגדרות נשמרו בהצלחה!", "success");
+                }).catch(error => {
+                    hideLoading(saveSettingsBtn);
+                    showNotification("שגיאה בשמירת הגדרות", "error");
+                    console.error("Error saving settings:", error);
+                });
+            }
+        };
+    }
+});
 
 // Enhanced error handling
 window.addEventListener('error', function(e) {
@@ -552,3 +707,4 @@ function smoothScrollToElement(element) {
         inline: 'nearest'
     });
 }
+
