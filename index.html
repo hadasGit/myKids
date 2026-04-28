@@ -2,171 +2,200 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#6366f1">
     <title id="page-title">הלוח שלי</title>
+    <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
-    <div class="app-container">
-        <!-- Header Section -->
-        <header class="app-header">
-            <div class="header-content">
-                <div class="header-left">
-                    <h1 id="app-title" class="app-title">הלוח שלי</h1>
-                    <div class="subtitle">ניהול חכם לפעילויות המשפחה</div>
-                </div>
-                <div class="header-actions">
-                    <button id="settingsBtn" class="settings-btn" title="הגדרות" style="display: none;">
-                        <i class="fas fa-cog"></i>
-                    </button>
-                </div>
-            </div>
-        </header>
+<div class="app-container">
 
-        <!-- Auth Section -->
-        <div id="auth-section" class="auth-section">
-            <div class="auth-content">
-                <div id="user-status" class="user-status">אנא התחברי לצפייה בנתונים</div>
-                <div class="auth-buttons">
-                    <button id="loginBtn" class="btn-primary" type="button" aria-label="התחברות עם Google">
-                        <i class="fab fa-google"></i>
-                        התחברות עם Google
-                    </button>
-                    <button id="redirectLoginBtn" class="btn-outline" type="button" style="display: none;" aria-label="התחברות בדף חדש">
-                        <i class="fas fa-external-link-alt"></i>
-                        התחברות בדף חדש
-                    </button>
-                    <button id="logoutBtn" class="btn-outline" type="button" style="display: none;" aria-label="התנתקות">
-                        <i class="fas fa-sign-out-alt"></i>
-                        התנתקות
-                    </button>
-                </div>
+    <!-- Header -->
+    <header class="app-header">
+        <div class="header-content">
+            <div class="header-left">
+                <h1 id="app-title" class="app-title">הלוח שלי</h1>
+                <div class="subtitle">ניהול חכם לפעילויות המשפחה</div>
+            </div>
+            <div class="header-actions">
+                <button id="settingsBtn" class="settings-btn" title="הגדרות" style="display:none;">
+                    <i class="fas fa-cog"></i>
+                </button>
             </div>
         </div>
+    </header>
 
-        <!-- Main Content -->
-        <div id="main-content" class="main-content" style="display: none;">
-            <!-- Timeline Controls -->
-            <div class="timeline-controls">
-                <div class="view-selector">
-                    <button id="viewDaily" class="btn-toggle active">יומי</button>
-                    <button id="viewWeekly" class="btn-toggle">שבועי</button>
-                </div>
-                
-                <div class="date-control">
-                    <input type="date" id="dateFilter" class="date-input">
-                    <button id="refreshBtn" class="btn-icon" title="רענון">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
-                </div>
-
-                <div class="filter-control">
-                    <button id="filterDropdownBtn" class="btn-icon" title="סינון">
-                        <i class="fas fa-filter"></i>
-                    </button>
-                    <div id="filterMenu" class="filter-menu" style="display: none;">
-                        <h4>סינון פעילויות</h4>
-                        <label class="filter-item">
-                            <input type="checkbox" class="filter-check" value="regular" checked>
-                            <span>רגילות</span>
-                        </label>
-                        <label class="filter-item">
-                            <input type="checkbox" class="filter-check" value="transport" checked>
-                            <span>הסעות</span>
-                        </label>
-                        <label class="filter-item">
-                            <input type="checkbox" class="filter-check" value="recurring" checked>
-                            <span>חוזרות</span>
-                        </label>
-                        <label class="filter-item">
-                            <input type="checkbox" class="filter-check" value="permanent" checked>
-                            <span>קבועות</span>
-                        </label>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Family Timeline -->
-            <div id="family-timeline" class="family-timeline">
-                <div class="timeline-header">
-                    <h3 class="timeline-title">
-                        <i class="fas fa-calendar-alt"></i>
-                        לוח זמנים משפחתי
-                    </h3>
-                    <div class="timeline-actions">
-                        <button id="toggleTimelineBtn" class="btn-icon">⊖</button>
-                        <button id="whatsappShareBtn" class="btn-share">
-                            <i class="fab fa-whatsapp"></i>
-                            שיתוף
-                        </button>
-                    </div>
-                </div>
-                <div id="timeline-content-area" class="timeline-content">
-                    <div id="timeline-list" class="timeline-list"></div>
-                </div>
-            </div>
-
-            <!-- Kids Container -->
-            <div id="kids-container" class="kids-container"></div>
-            
-            <button id="addKidBtn" class="add-kid-btn">
-                <i class="fas fa-plus"></i>
-                הוספת פעילויות
-            </button>
-        </div>
-
-        <!-- Modal Backdrop -->
-        <div id="modalBackdrop" class="modal-backdrop">
-            <div id="modal" class="modal">
-                <div class="modal-header">
-                    <h2 id="modalTitle" class="modal-title"></h2>
-                    <button id="closeModal" class="close-btn">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div id="modalContent" class="modal-content"></div>
-            </div>
-        </div>
-
-        <!-- Settings Modal -->
-        <div id="settingsModalBackdrop" class="modal-backdrop">
-            <div class="settings-modal">
-                <div class="modal-header">
-                    <h2>הגדרות אפליקציה</h2>
-                    <button class="close-btn" onclick="document.getElementById('settingsModalBackdrop').style.display = 'none'">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="modal-content">
-                    <div class="settings-form">
-                        <div class="form-group">
-                            <label>כותרת האפליקציה:</label>
-                            <input type="text" id="settingsTitle" placeholder="הלוח שלי">
-                        </div>
-                        <div class="form-group">
-                            <label>שם הישויות:</label>
-                            <input type="text" id="settingsEntityName" placeholder="פעילויות">
-                        </div>
-                        <div class="form-group">
-                            <label>תצוגה ברירת מחדל:</label>
-                            <select id="settingsDefaultView">
-                                <option value="daily">יומי</option>
-                                <option value="weekly">שבועי</option>
-                            </select>
-                        </div>
-                        <button id="saveSettingsBtn" class="btn-primary">שמירת הגדרות</button>
-                    </div>
-                </div>
+    <!-- Auth Section -->
+    <div id="auth-section" class="auth-section">
+        <div class="auth-content">
+            <span class="auth-icon">👨‍👩‍👧‍👦</span>
+            <div id="user-status" class="user-status">אנא התחברי לצפייה בנתונים</div>
+            <div class="auth-buttons">
+                <button id="loginBtn" class="btn-primary" type="button">
+                    <i class="fab fa-google"></i> התחברות עם Google
+                </button>
+                <button id="redirectLoginBtn" class="btn-outline" type="button" style="display:none;">
+                    <i class="fas fa-external-link-alt"></i> התחברות בדף חדש
+                </button>
+                <button id="logoutBtn" class="btn-outline" type="button" style="display:none;">
+                    <i class="fas fa-sign-out-alt"></i> התנתקות
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- Firebase Scripts -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
-    <script src="script.js"></script>
+    <!-- Main Content -->
+    <div id="main-content" class="main-content" style="display:none;">
+
+        <!-- Timeline Controls -->
+        <div class="timeline-controls">
+            <div class="view-selector">
+                <button id="viewDaily"  class="btn-toggle active">יומי</button>
+                <button id="viewWeekly" class="btn-toggle">שבועי</button>
+            </div>
+
+            <div class="date-control">
+                <input type="date" id="dateFilter" class="date-input">
+                <button id="refreshBtn" class="btn-icon" title="רענון">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+
+            <div class="filter-control">
+                <button id="filterDropdownBtn" class="btn-icon" title="סינון">
+                    <i class="fas fa-filter"></i>
+                </button>
+                <div id="filterMenu" class="filter-menu" style="display:none;">
+                    <h4>סינון פעילויות</h4>
+                    <label class="filter-item">
+                        <input type="checkbox" class="filter-check" value="regular" checked>
+                        <span>⚡ רגילות</span>
+                    </label>
+                    <label class="filter-item">
+                        <input type="checkbox" class="filter-check" value="transport" checked>
+                        <span>🚗 הסעות</span>
+                    </label>
+                    <label class="filter-item">
+                        <input type="checkbox" class="filter-check" value="recurring" checked>
+                        <span>🔁 חוזרות</span>
+                    </label>
+                    <label class="filter-item">
+                        <input type="checkbox" class="filter-check" value="permanent" checked>
+                        <span>📌 קבועות</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Family Timeline -->
+        <div id="family-timeline" class="family-timeline" style="display:none;">
+            <div class="timeline-header">
+                <h3 class="timeline-title">
+                    <i class="fas fa-calendar-alt"></i>
+                    לוח משפחתי
+                </h3>
+                <div class="timeline-actions">
+                    <button id="toggleTimelineBtn" class="btn-icon" title="הסתר/הצג" style="font-size:1rem;">➖</button>
+                    <button id="whatsappShareBtn" class="btn-share" disabled>
+                        <i class="fab fa-whatsapp"></i> שיתוף
+                    </button>
+                </div>
+            </div>
+            <div id="timeline-content-area">
+                <div id="timeline-list" class="timeline-list"></div>
+            </div>
+        </div>
+
+        <!-- Kids Container -->
+        <div id="kids-container" class="kids-container"></div>
+
+        <!-- FAB spacer so content doesn't hide behind floating button -->
+        <div class="fab-spacer"></div>
+
+    </div><!-- /main-content -->
+
+</div><!-- /app-container -->
+
+<!-- Floating Add Button -->
+<button id="addKidBtn" class="add-kid-btn" style="display:none;">
+    <i class="fas fa-plus"></i> הוספת פעילות
+</button>
+
+<!-- ====== ACTIVITY MODAL (Bottom Sheet) ====== -->
+<div id="modalBackdrop" class="modal-backdrop">
+    <div id="modal" class="modal">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+            <h2 id="modalTitle" class="modal-title"></h2>
+            <button id="closeModal" class="close-btn" aria-label="סגירה">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div id="modalContent" class="modal-content"></div>
+    </div>
+</div>
+
+<!-- ====== SETTINGS MODAL (Bottom Sheet) ====== -->
+<div id="settingsModalBackdrop" class="modal-backdrop">
+    <div class="settings-modal">
+        <div class="modal-handle"></div>
+        <div class="modal-header">
+            <h2 class="modal-title">⚙️ הגדרות</h2>
+            <button class="close-btn" onclick="document.getElementById('settingsModalBackdrop').style.display='none'" aria-label="סגירה">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-content">
+            <div class="settings-form">
+                <div class="form-group">
+                    <label>כותרת האפליקציה</label>
+                    <input type="text" id="settingsTitle" placeholder="הלוח שלי">
+                </div>
+                <div class="form-group">
+                    <label>שם הישויות (ילד / פעילות / ...)</label>
+                    <input type="text" id="settingsEntityName" placeholder="פעילויות">
+                </div>
+                <div class="form-group">
+                    <label>תצוגת ברירת מחדל</label>
+                    <select id="settingsDefaultView">
+                        <option value="daily">יומי</option>
+                        <option value="weekly">שבועי</option>
+                    </select>
+                </div>
+                <button id="saveSettingsBtn" class="btn-primary">💾 שמירת הגדרות</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+<script src="script.js"></script>
+
+<script>
+// Show FAB and main-content toggle based on auth state
+// (handled inside script.js — this ensures addKidBtn only shows when logged in)
+document.addEventListener('DOMContentLoaded', () => {
+    const obs = new MutationObserver(() => {
+        const mc = document.getElementById('main-content');
+        const fab = document.getElementById('addKidBtn');
+        if (mc && fab) {
+            fab.style.display = mc.style.display === 'block' ? 'flex' : 'none';
+        }
+    });
+    const mc = document.getElementById('main-content');
+    if (mc) obs.observe(mc, { attributes: true, attributeFilter: ['style'] });
+});
+</script>
+
 </body>
 </html>
