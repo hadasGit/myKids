@@ -1,6 +1,6 @@
-// Family Schedule App JavaScript - Enhanced Version
+// ===== FAMILY SCHEDULE APP — Enhanced v2 =====
 
-// Firebase Configuration
+// ===== Firebase Configuration =====
 const firebaseConfig = {
   apiKey: "AIzaSyD9IzSor82cM39XgdLbywBdq-bM8m2c_ak",
   authDomain: "mykids-3f832.firebaseapp.com",
@@ -9,702 +9,714 @@ const firebaseConfig = {
   messagingSenderId: "869870400492",
   appId: "1:869870400492:web:80200b8102afb53e1c06c9",
   measurementId: "G-Q3X18J3SJ4",
-  databaseURL:  "https://mykids-3f832-default-rtdb.firebaseio.com"
+  databaseURL: "https://mykids-3f832-default-rtdb.firebaseio.com"
 };
 
-// Initialize Firebase
-let app;
-if (!firebase.apps.length) {
-    app = firebase.initializeApp(firebaseConfig);
-    console.log('Firebase initialized successfully');
-} else {
-    app = firebase.app();
-    console.log('Firebase already initialized');
-}
-
-const db = firebase.database();
+// ===== Initialize Firebase =====
+const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(firebaseConfig);
+const db   = firebase.database();
 const auth = firebase.auth();
 
-// Configure Google Auth Provider
 const googleProvider = new firebase.auth.GoogleAuthProvider();
 googleProvider.addScope('email');
 googleProvider.addScope('profile');
-googleProvider.setCustomParameters({
-  prompt: 'select_account'
-});
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 
-console.log('Firebase Auth:', auth);
-console.log('Firebase Database:', db);
-console.log('Google Auth Provider:', googleProvider);
+// ===== Kid color palette (fixed by index) =====
+const KID_COLORS = ['#6366f1','#f43f5e','#10b981','#f59e0b','#8b5cf6','#06b6d4','#ec4899','#14b8a6'];
 
-// Global Variables
-let userKidsRef = null;
-let userSettingsRef = null;
-let currentTimelineView = 'daily';
-let activeFilters = ['regular', 'transport', 'recurring', 'permanent']; 
-let appSettings = { title: "הלוח שלי", entityName: "פעילות", defaultView: "daily" };
+function getKidColor(index) {
+    return KID_COLORS[index % KID_COLORS.length];
+}
+
+function getInitials(name = '') {
+    return name.trim().slice(0, 2) || '?';
+}
+
+// ===== Global State =====
+let userKidsRef      = null;
+let userSettingsRef  = null;
+let currentView      = 'daily';
+let activeFilters    = ['regular','transport','recurring','permanent'];
+let appSettings      = { title: 'הלוח שלי', entityName: 'פעילות', defaultView: 'daily' };
 let isTimelineVisible = true;
+let kidsColorMap     = {};   // kidId → color
+let kidsIndexMap     = {};   // kidId → index
 
-// Utility Functions
+// ===== Utilities =====
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
-// Initialize date filter - wrap in try-catch
-try {
-    const dateFilter = document.getElementById("dateFilter");
-    if (dateFilter) {
-        dateFilter.value = todayStr();
-        console.log('Date filter initialized successfully');
-    } else {
-        console.error('Date filter element not found');
-    }
-} catch (error) {
-    console.error('Error initializing date filter:', error);
+function el(id) { return document.getElementById(id); }
+
+function formatTimeRange(start, end) {
+    if (!start) return '––';
+    if (!end)   return start;
+    return `${start}–${end}`;
 }
 
-// Show loading states
-function showLoading(element) {
-    if (element) {
-        element.classList.add('loading');
-    }
+function hebrewDay(dateStr) {
+    const days = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+    const d = new Date(dateStr + 'T00:00:00');
+    return `יום ${days[d.getDay()]}`;
 }
 
-function hideLoading(element) {
-    if (element) {
-        element.classList.remove('loading');
-    }
+function formatDate(dateStr) {
+    const [y, m, d] = dateStr.split('-');
+    return `${d}/${m}`;
 }
 
-// Enhanced notification system
+// ===== Notifications =====
 function showNotification(message, type = 'success') {
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        padding: 16px 24px;
-        background: ${type === 'success' ? 'var(--success-gradient)' : 'var(--secondary-gradient)'};
-        color: white;
-        border-radius: var(--border-radius-sm);
-        box-shadow: var(--shadow-lg);
-        z-index: 10000;
-        animation: slideInRight 0.3s ease;
-    `;
-    notification.textContent = message;
-    document.body.appendChild(notification);
-    
+    // Remove any existing
+    document.querySelectorAll('.notification').forEach(n => n.remove());
+
+    const n = document.createElement('div');
+    n.className = `notification notif-${type} show`;
+    n.textContent = message;
+    document.body.appendChild(n);
+
     setTimeout(() => {
-        notification.style.animation = 'slideOutRight 0.3s ease';
-        setTimeout(() => notification.remove(), 300);
-    }, 3000);
+        n.classList.remove('show');
+        n.classList.add('hide');
+        setTimeout(() => n.remove(), 350);
+    }, 2800);
 }
 
-// Add CSS animations
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes slideInRight {
-        from { transform: translateX(100%); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
-    }
-    @keyframes slideOutRight {
-        from { transform: translateX(0); opacity: 1; }
-        to { transform: translateX(100%); opacity: 0; }
-    }
-`;
-document.head.appendChild(style);
+// ===== Loading =====
+function showLoading(el) { if(el) el.classList.add('loading'); }
+function hideLoading(el) { if(el) el.classList.remove('loading'); }
 
-// Authentication State Management
+// ===== Auth State =====
 auth.onAuthStateChanged(user => {
-    console.log('Auth state changed:', user);
-    const authSection = document.getElementById("auth-section");
-    showLoading(authSection);
-    
     if (user) {
-        console.log('User is signed in:', user.displayName, user.email);
-        document.getElementById("user-status").textContent = `שלום, ${user.displayName}`;
-        document.getElementById("loginBtn").style.display = "none";
-        document.getElementById("redirectLoginBtn").style.display = "none";
-        document.getElementById("logoutBtn").style.display = "inline-flex";
-        document.getElementById("settingsBtn").style.display = "flex";
-        document.getElementById("main-content").style.display = "block";
-        
+        el('user-status').textContent = `שלום, ${user.displayName} 👋`;
+        el('loginBtn').style.display = 'none';
+        el('redirectLoginBtn').style.display = 'none';
+        el('logoutBtn').style.display = 'inline-flex';
+        el('settingsBtn').style.display = 'flex';
+        el('main-content').style.display = 'block';
+
         userSettingsRef = db.ref(`users/${user.uid}/settings`);
-        userSettingsRef.on("value", snap => {
+        userSettingsRef.on('value', snap => {
             if (snap.exists()) {
                 appSettings = snap.val();
-                if (!window.initialLoadDone) {
-                    currentTimelineView = appSettings.defaultView || 'daily';
-                    window.initialLoadDone = true;
+                if (!window._initialLoadDone) {
+                    currentView = appSettings.defaultView || 'daily';
+                    window._initialLoadDone = true;
                 }
                 updateUI();
             }
-            hideLoading(authSection);
         });
 
         userKidsRef = db.ref(`users/${user.uid}/kids`);
-        userKidsRef.on("value", snapshot => {
+        userKidsRef.on('value', snapshot => {
             renderKids(snapshot.val());
-            hideLoading(document.getElementById("kids-container"));
         });
+
         setupToggleBtn();
-        showNotification('התחברת בהצלחה!', 'success');
+
     } else {
-        console.log('User is signed out');
-        document.getElementById("user-status").textContent = "אנא התחברי לצפייה בנתונים";
-        document.getElementById("loginBtn").style.display = "inline-flex";
-        document.getElementById("logoutBtn").style.display = "none";
-        document.getElementById("settingsBtn").style.display = "none";
-        document.getElementById("main-content").style.display = "none";
-        
-        // Hide redirect button by default
-        const redirectLoginBtn = document.getElementById("redirectLoginBtn");
-        if (redirectLoginBtn) {
-            redirectLoginBtn.style.display = "none";
-        }
-        
+        el('user-status').textContent = 'אנא התחברי לצפייה בנתונים';
+        el('loginBtn').style.display = 'inline-flex';
+        el('logoutBtn').style.display = 'none';
+        el('settingsBtn').style.display = 'none';
+        el('main-content').style.display = 'none';
+        el('redirectLoginBtn').style.display = 'none';
+        window._initialLoadDone = false;
         userKidsRef = null;
-        hideLoading(authSection);
     }
 });
 
 function updateUI() {
-    document.getElementById("app-title").textContent = appSettings.title;
-    document.getElementById("page-title").textContent = appSettings.title;
-    document.getElementById("addKidBtn").textContent = `הוספת ${appSettings.entityName}`;
-    document.getElementById("viewDaily").classList.toggle('active', currentTimelineView === 'daily');
-    document.getElementById("viewWeekly").classList.toggle('active', currentTimelineView === 'weekly');
+    el('app-title').textContent   = appSettings.title;
+    el('page-title').textContent  = appSettings.title;
+    el('addKidBtn').innerHTML     = `<i class="fas fa-plus"></i> הוספת ${appSettings.entityName}`;
+    el('viewDaily').classList.toggle('active',  currentView === 'daily');
+    el('viewWeekly').classList.toggle('active', currentView === 'weekly');
 }
 
 function setupToggleBtn() {
-    const btn = document.getElementById("toggleTimelineBtn");
-    const content = document.getElementById("timeline-content-area");
-    if (btn && content) {
-        btn.onclick = () => {
-            isTimelineVisible = !isTimelineVisible;
-            content.style.display = isTimelineVisible ? "block" : "none";
-            btn.textContent = isTimelineVisible ? "➖" : "➕";
-        };
-    }
-}
-
-// Generate random pastel color
-function getPastelColor() {
-    const hue = Math.floor(Math.random() * 360);
-    return `hsl(${hue}, 70%, 92%)`;
-}
-
-// Main Rendering Functions
-function renderKids(kids) {
-    const container = document.getElementById("kids-container");
-    const timelineList = document.getElementById("timeline-list");
-    const timelineContainer = document.getElementById("family-timeline");
-    container.innerHTML = "";
-    timelineList.innerHTML = "";
-    
-    timelineContainer.style.display = kids ? "block" : "none";
-    if (!kids) return;
-
-    const selectedDate = document.getElementById("dateFilter").value;
-    const baseDate = new Date(selectedDate);
-    let allActivities = [];
-    
-    Object.keys(kids).forEach(kidId => {
-        const kid = kids[kidId];
-        const activities = kid.activities || [];
-        
-        const box = document.createElement("div");
-        box.className = "kid-box";
-        box.style.backgroundColor = getPastelColor();
-        box.style.border = "1px solid rgba(0,0,0,0.05)";
-        
-        box.onclick = () => openKidModal(kidId, kid);
-        
-        const nameEl = document.createElement("div");
-        nameEl.innerHTML = `<strong>${kid.name}</strong>`;
-        nameEl.style.fontSize = "22px";
-        nameEl.style.marginBottom = "10px";
-        box.appendChild(nameEl);
-
-        const actList = document.createElement("div");
-        activities.forEach(a => {
-            // Check if activity has expired
-            const todayStr = new Date().toISOString().slice(0, 10);
-            if (a.isPermanent && a.date < todayStr) {
-                userKidsRef.child(kidId).child('activities').child(a.id).remove(); 
-                return;
-            }
-        
-            // Check if permanent activity should be displayed
-            if (a.isPermanent && selectedDate > a.date) {
-                return;
-            }
-
-            const isMatch = a.date === selectedDate || (a.repeatWeekly && new Date(a.date).getDay() === baseDate.getDay());
-        
-            // Display in personal boxes
-            if (!a.isPermanent && isMatch) {
-                const aEl = document.createElement("div");
-                aEl.style.fontSize = "16px";
-                aEl.textContent = `${formatTimeRange(a.time, a.endTime)} ${a.title}${a.isTransport ? ' 🚗' : ''}${a.repeatWeekly ? ' 🔁' : ''}`;
-                actList.appendChild(aEl);
-            }
-            if (a.isPermanent) {
-                const nDiv = document.createElement("div");
-                nDiv.className = "permanent-note";
-                nDiv.textContent = `📌 ${a.title}`;
-                actList.appendChild(nDiv);
-            }
-
-            // Filter logic for family timeline
-            const type = a.isTransport ? 'transport' : (a.repeatWeekly ? 'recurring' : (a.isPermanent ? 'permanent' : 'regular'));
-            
-            if (!activeFilters.includes(type)) return;
-
-            const checkTimelineMatch = (dStr) => {
-                const d = new Date(dStr);
-                if (a.isPermanent) return a.date === dStr;
-                return a.date === dStr || (a.repeatWeekly && new Date(a.date).getDay() === d.getDay());
-            };
-
-            if (currentTimelineView === 'daily') {
-                if (checkTimelineMatch(selectedDate)) allActivities.push({ ...a, kidName: kid.name, displayDate: selectedDate });
-            } else {
-                for (let i = 0; i < 7; i++) {
-                    let t = new Date(baseDate); t.setDate(baseDate.getDate() + i);
-                    let ts = t.toISOString().slice(0, 10);
-                    if (checkTimelineMatch(ts)) allActivities.push({ ...a, kidName: kid.name, displayDate: ts });
-                }
-            }
-        });
-
-        box.appendChild(actList);
-        const del = document.createElement("span");
-        del.className = "delete-kid"; del.innerHTML = "&times;";
-        del.onclick = (e) => { e.stopPropagation(); if(confirm(`למחוק את ${kid.name}?`)) userKidsRef.child(kidId).remove(); };
-        box.appendChild(del);
-        container.appendChild(box);
-    });
-
-    renderTimelineList(allActivities, timelineList, timelineContainer);
-}
-
-function renderTimelineList(allActivities, timelineList, timelineContainer) {
-    timelineContainer.style.display = "block";
-    timelineList.innerHTML = "";
-
-    if (allActivities.length > 0) {
-        allActivities.sort((a, b) => a.displayDate.localeCompare(b.displayDate) || (a.time || "99:99").localeCompare(b.time || "99:99"));
-
-        let lastHeader = "";
-        allActivities.forEach(act => {
-            if (currentTimelineView === 'weekly' && act.displayDate !== lastHeader) {
-                const header = document.createElement("div");
-                header.style = "background:#eee; padding:4px 8px; font-size:12px; font-weight:bold; margin-top:10px; border-radius:4px; border-right: 3px solid #4CAF50;";
-                header.textContent = act.displayDate.split('-').reverse().join('/');
-                timelineList.appendChild(header);
-                lastHeader = act.displayDate;
-            }
-           
-            // Transport icon logic
-            let transportHtml = "";
-            if (act.isTransport) {
-                const isReturn = act.isReturn;
-                const style = isReturn 
-                    ? "display: inline-block; transform: scaleX(-1); filter: hue-rotate(150deg); drop-shadow(0 0 2px orange);" 
-                    : "display: inline-block;";
-                
-                transportHtml = `<span style="${style}" title="${isReturn ? 'חזור' : 'הלוך'}">🚗</span>`;
-            }
-            const item = document.createElement("div");
-            item.className = "timeline-item";
-            item.innerHTML = `
-                <span class="timeline-time">${formatTimeRange(act.time, act.endTime)}</span>
-                <span class="timeline-content">
-                    <span class="timeline-kid-name">${act.kidName}</span> 
-                    ${act.isPermanent ? '📌 ' : ''}${act.title} ${transportHtml} ${act.repeatWeekly ? '🔁' : ''}
-                </span>`;
-            timelineList.appendChild(item);
-        });
-        document.getElementById("whatsappShareBtn").style.opacity = "1";
-        document.getElementById("whatsappShareBtn").disabled = false;
-    } else {
-        timelineList.innerHTML = "<div style='text-align:center; padding:20px; color:#999;'>אין פעילויות להצגה בסינון זה</div>";
-        document.getElementById("whatsappShareBtn").style.opacity = "0.5";
-        document.getElementById("whatsappShareBtn").disabled = true;
-    }
-}   
-
-// Sharing Functions
-function shareActivity(kidName, a) {
-    const data = btoa(unescape(encodeURIComponent(JSON.stringify(a))));
-    const url = `${window.location.origin}${window.location.pathname}?sharedAct=${data}`;
-    const txt = `פעילות עבור ${kidName}: ${a.title}. להוספה: ${url}`;
-    if (navigator.share) navigator.share({ title: 'שיתוף', text: txt, url: url });
-    else { navigator.clipboard.writeText(txt); alert("הועתק ללוח!"); }
-}
-
-function shareEntireKid(kidId, kidName) {
-    userKidsRef.child(kidId).once("value", snap => {
-        const data = btoa(unescape(encodeURIComponent(JSON.stringify(snap.val()))));
-        const url = `${window.location.origin}${window.location.pathname}?sharedKid=${data}`;
-        if (navigator.share) navigator.share({ title: kidName, url: url });
-        else { navigator.clipboard.writeText(url); alert("קישור הועתק!"); }
-    });
-}
-
-function formatTimeRange(start, end) {
-    if (!start) return "--:--";
-    if (!end) return start;
-    return `${start}-${end}`;
-}
-
-// Modal Functions
-function openKidModal(kidId, kid, activityToEdit = null) {
-    const modalContent = document.getElementById("modalContent");
-    document.getElementById("modalTitle").innerHTML = activityToEdit ? `עריכה` : kid.name;
-    modalContent.innerHTML = "";
-    document.getElementById("modalBackdrop").style.display = "flex";
-    const activities = kid.activities || [];
-
-    if (!activityToEdit) {
-        const shareBtn = document.createElement("button");
-        shareBtn.innerHTML = "🔗 שיתוף לוח אישי";
-        shareBtn.style = "margin-bottom:15px; background:#10b981; color:white; border:none; padding:10px; border-radius:8px; cursor:pointer; width:100%; font-weight:bold;";
-        shareBtn.onclick = () => shareEntireKid(kidId, kid.name);
-        modalContent.appendChild(shareBtn);
-
-        const list = document.createElement("div");
-        activities.sort((a,b) => a.date.localeCompare(b.date)).forEach(a => {
-            const item = document.createElement("div");
-            item.className = "activity-item";
-            const dateFmt = a.date.split('-').reverse().join('/');
-            const icons = `${a.isPermanent ? '📌' : ''}${a.isTransport ? '🚗' : ''}${a.repeatWeekly ? '🔁' : ''}`;
-            item.innerHTML = `<span>${dateFmt} | ${formatTimeRange(a.time, a.endTime)} ${a.title} ${icons}</span>
-                <div style="display:flex; gap:5px;">
-                    <button onclick="event.stopPropagation(); shareActivity('${kid.name}', ${JSON.stringify(a).replace(/"/g, '&quot;')})" style="background:#10b981; color:white; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">🔗</button>
-                    <button class="btn-edit" onclick="event.stopPropagation(); openKidModal('${kidId}', ${JSON.stringify(kid).replace(/"/g, '&quot;')}, ${JSON.stringify(a).replace(/"/g, '&quot;')})">✏️</button>
-                    <button class="btn-delete" onclick="event.stopPropagation(); deleteActivity('${kidId}', '${a.id}')">🗑️</button>
-                </div>`;
-            list.appendChild(item);
-        });
-        modalContent.appendChild(list);
-    }
-
-    const form = document.createElement("div");
-    form.className = "add-activity-form";
-    const dDate = activityToEdit ? activityToEdit.date : todayStr();
-    form.innerHTML = `
-        <input type="date" id="newActDate" value="${dDate}">
-        <input type="text" id="newActTitle" placeholder="מה עושים?" value="${activityToEdit ? activityToEdit.title : ''}">
-         <div style="display: flex; align-items: center; gap: 5px; font-size: 12px;">
-            <span>משעה:</span>
-            <input type="time" id="newActTime" style="width: auto;" value="${activityToEdit ? activityToEdit.time : ''}">
-            <span>-</span>
-            <span>עד שעה:</span>
-            <input type="time" id="newActEndTime" style="width: auto;" value="${activityToEdit ? activityToEdit.endTime : ''}">
-         </div>
-       
-        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; font-size:12px; margin-top:5px;">
-            <label><input type="checkbox" id="newActPerm" ${activityToEdit?.isPermanent ? 'checked' : ''}> קבוע</label>
-            <label><input type="checkbox" id="newActRepeat" ${activityToEdit?.repeatWeekly ? 'checked' : ''}> חוזר</label>
-            <label><input type="checkbox" id="newActTrans"  onchange="document.getElementById('returnOption').style.display = this.checked ? 'block' : 'none'" ${activityToEdit?.isTransport ? 'checked' : ''}> הסעה 🚗</label>
-        </div>
-  
-        <div id="returnOption" style="display: ${activityToEdit?.isTransport ? 'block' : 'none'}; margin-top: 5px; font-size: 12px; border-top: 1px dotted #ccc; pt: 5px;">
-            <label style="color: #e67e22;">
-                <input type="checkbox" id="newActIsReturn" ${activityToEdit?.isReturn ? 'checked' : ''}> האם זו הסעה חזור? (הביתה) 🏠
-            </label>
-        </div>
-        <button id="saveActBtn" style="margin-top:10px; padding:10px; background:#4CAF50; color:white; border:none; border-radius:6px; cursor:pointer;">שמור</button>
-    `;
-    modalContent.appendChild(form);
-
-    document.getElementById("saveActBtn").onclick = () => {
-        const title = document.getElementById("newActTitle").value;
-        const date = document.getElementById("newActDate").value;
-        if (!title || !date) return alert("חובה למלא הכל");
-        const newAct = {
-            id: activityToEdit ? activityToEdit.id : "a_" + Date.now(),
-            title, 
-            date, 
-            time: document.getElementById("newActTime").value || "",
-            endTime: document.getElementById("newActEndTime").value || "",
-            isPermanent: document.getElementById("newActPerm").checked,
-            repeatWeekly: document.getElementById("newActRepeat").checked,
-            isTransport: document.getElementById("newActTrans").checked,
-            isReturn: document.getElementById("newActIsReturn").checked
-        };
-       
-        const newList = activityToEdit ? activities.map(a => a.id === activityToEdit.id ? newAct : a) : [...activities, newAct];
-        userKidsRef.child(kidId).child("activities").set(newList).then(() => {
-            userKidsRef.child(kidId).once("value", s => openKidModal(kidId, s.val()));
-        });
+    const btn     = el('toggleTimelineBtn');
+    const content = el('timeline-content-area');
+    if (!btn || !content) return;
+    btn.onclick = () => {
+        isTimelineVisible = !isTimelineVisible;
+        content.style.display = isTimelineVisible ? 'block' : 'none';
+        btn.textContent = isTimelineVisible ? '➖' : '➕';
     };
 }
 
-// Activity deletion function
-window.deleteActivity = (kidId, actId) => {
-    if(!confirm("למחוק את הפעילות?")) return;
-    
-    userKidsRef.child(kidId).child("activities").once("value", snap => {
-        const currentActivities = snap.val() || [];
-        const filtered = currentActivities.filter(a => String(a.id) !== String(actId));
-        
-        userKidsRef.child(kidId).child("activities").set(filtered).then(() => {
-            userKidsRef.child(kidId).once("value", s => {
-                if (s.exists()) {
-                    openKidModal(kidId, s.val());
-                } else {
-                    document.getElementById("modalBackdrop").style.display = "none";
-                }
-            });
-        }).catch(err => console.error("מחיקה נכשלה:", err));
+// ===== Render Kids =====
+function renderKids(kids) {
+    const container    = el('kids-container');
+    const timelineList = el('timeline-list');
+    const timelineBox  = el('family-timeline');
+    container.innerHTML    = '';
+    timelineList.innerHTML = '';
+
+    if (!kids) {
+        timelineBox.style.display = 'none';
+
+        // Empty state
+        const empty = document.createElement('div');
+        empty.className = 'empty-state';
+        empty.innerHTML = `<span class="empty-state-icon">👨‍👩‍👧‍👦</span><p>עדיין לא הוספת ילדים.<br>לחצי על הכפתור למטה כדי להתחיל!</p>`;
+        container.appendChild(empty);
+        return;
+    }
+
+    timelineBox.style.display = 'block';
+
+    const selectedDate = el('dateFilter').value || todayStr();
+    const baseDate     = new Date(selectedDate + 'T00:00:00');
+    let allActivities  = [];
+
+    // Assign stable colors by order
+    const kidIds = Object.keys(kids);
+    kidIds.forEach((kidId, idx) => {
+        kidsColorMap[kidId] = getKidColor(idx);
+        kidsIndexMap[kidId] = idx;
     });
-};
 
-// Event Listeners
-document.addEventListener('DOMContentLoaded', () => {
-    const filterBtn = document.getElementById("filterDropdownBtn");
-    const filterMenu = document.getElementById("filterMenu");
+    kidIds.forEach(kidId => {
+        const kid        = kids[kidId];
+        const activities = Array.isArray(kid.activities) ? kid.activities : Object.values(kid.activities || {});
+        const color      = kidsColorMap[kidId];
 
-    if(filterBtn) {
-        filterBtn.onclick = (e) => {
+        // --- Kid Card ---
+        const box = document.createElement('div');
+        box.className = 'kid-box';
+        box.style.setProperty('--kid-color', color);
+        box.style.borderTop = `5px solid ${color}`;
+
+        // Avatar
+        const avatar = document.createElement('div');
+        avatar.className = 'kid-avatar';
+        avatar.style.background = color;
+        avatar.textContent = getInitials(kid.name);
+        box.appendChild(avatar);
+
+        // Name
+        const nameEl = document.createElement('div');
+        nameEl.className = 'kid-name';
+        nameEl.textContent = kid.name;
+        box.appendChild(nameEl);
+
+        // Today's activities count
+        const todayActs = activities.filter(a => {
+            if (a.isPermanent) return false;
+            return a.date === selectedDate || (a.repeatWeekly && new Date(a.date + 'T00:00:00').getDay() === baseDate.getDay());
+        });
+
+        const countEl = document.createElement('div');
+        countEl.className = 'kid-activities-count';
+        countEl.textContent = todayActs.length > 0 ? `${todayActs.length} פעילות היום` : 'אין פעילויות היום';
+        box.appendChild(countEl);
+
+        // Preview (first 2 activities)
+        if (todayActs.length > 0) {
+            const preview = document.createElement('div');
+            preview.className = 'kid-activity-preview';
+            preview.textContent = todayActs.slice(0, 2).map(a => `${formatTimeRange(a.time, a.endTime)} ${a.title}`).join('\n');
+            preview.style.whiteSpace = 'pre-line';
+            box.appendChild(preview);
+        }
+
+        // Permanent notes
+        const permActs = activities.filter(a => a.isPermanent);
+        permActs.forEach(a => {
+            const pEl = document.createElement('div');
+            pEl.className = 'permanent-note';
+            pEl.textContent = `📌 ${a.title}`;
+            box.appendChild(pEl);
+        });
+
+        // Delete kid button
+        const del = document.createElement('span');
+        del.className = 'delete-kid';
+        del.innerHTML = '&times;';
+        del.title = 'מחיקה';
+        del.onclick = e => {
             e.stopPropagation();
-            filterMenu.style.display = filterMenu.style.display === "none" ? "block" : "none";
-        };
-    }
-
-    document.onclick = () => { if(filterMenu) filterMenu.style.display = "none"; };
-    if(filterMenu) filterMenu.onclick = (e) => e.stopPropagation();
-
-    document.querySelectorAll('.filter-check').forEach(checkbox => {
-        checkbox.onchange = () => {
-            activeFilters = Array.from(document.querySelectorAll('.filter-check:checked')).map(cb => cb.value);
-            if (userKidsRef) userKidsRef.once("value", s => renderKids(s.val()));
-        };
-    });
-});
-
-
-
-// Wait for DOM to be ready before attaching event handlers
-window.addEventListener('load', function() {
-    console.log('Window loaded, attaching login handler...');
-    
-    const loginBtn = document.getElementById("loginBtn");
-    const redirectLoginBtn = document.getElementById("redirectLoginBtn");
-    console.log('Login button element:', loginBtn);
-    console.log('Redirect login button element:', redirectLoginBtn);
-    
-    if (loginBtn) {
-        loginBtn.onclick = async (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            console.log('Login button clicked!');
-            
-            // Prevent multiple clicks
-            if (loginBtn.disabled) {
-                return;
+            if (confirm(`למחוק את ${kid.name} וכל הפעילויות?`)) {
+                userKidsRef.child(kidId).remove();
+                showNotification(`${kid.name} נמחק/ה`, 'error');
             }
-            
-            // Remove focus to prevent "focus locked" message
-            loginBtn.blur();
-            
-            try {
-                showLoading(loginBtn);
-                loginBtn.disabled = true;
-                
-                // Use signInWithPopup with the configured provider
-                const result = await auth.signInWithPopup(googleProvider);
-                console.log('Login successful:', result.user);
-                
-                hideLoading(loginBtn);
-                loginBtn.disabled = false;
-                showNotification(`ברוך הבא ${result.user.displayName}!`, "success");
-                
-            } catch (error) {
-                console.error('Login error:', error);
-                hideLoading(loginBtn);
-                loginBtn.disabled = false;
-                
-                // Handle specific error codes
-                if (error.code === 'auth/popup-closed-by-user') {
-                    showNotification("ההתחברות בוטלה על ידי המשתמש", "error");
-                } else if (error.code === 'auth/popup-blocked') {
-                    showNotification("הדפדפן חסם את חלון ההתחברות. נסה את כפתור 'התחברות בדף חדש'", "error");
-                    // Show redirect button as alternative
-                    if (redirectLoginBtn) {
-                        redirectLoginBtn.style.display = "inline-flex";
-                    }
-                } else if (error.code === 'auth/cancelled-popup-request') {
-                    // Multiple popups, ignore this one
-                    return;
-                } else if (error.code === 'auth/unauthorized-domain') {
-                    showNotification("הדומיין לא מורשה. אנא צור קשר עם המפתח.", "error");
-                } else {
-                    showNotification("שגיאה בהתחברות: " + error.message, "error");
-                    // Show redirect button as alternative
-                    if (redirectLoginBtn) {
-                        redirectLoginBtn.style.display = "inline-flex";
+        };
+        box.appendChild(del);
+
+        box.onclick = () => openKidModal(kidId, kid);
+        container.appendChild(box);
+
+        // --- Collect timeline activities ---
+        activities.forEach(a => {
+            const type = a.isTransport ? 'transport' : (a.repeatWeekly ? 'recurring' : (a.isPermanent ? 'permanent' : 'regular'));
+            if (!activeFilters.includes(type)) return;
+
+            const matchDate = dStr => {
+                const d = new Date(dStr + 'T00:00:00');
+                if (a.isPermanent) return a.date === dStr;
+                return a.date === dStr || (a.repeatWeekly && new Date(a.date + 'T00:00:00').getDay() === d.getDay());
+            };
+
+            if (currentView === 'daily') {
+                if (matchDate(selectedDate)) {
+                    allActivities.push({ ...a, kidName: kid.name, kidColor: color, displayDate: selectedDate });
+                }
+            } else {
+                for (let i = 0; i < 7; i++) {
+                    const t  = new Date(baseDate); t.setDate(baseDate.getDate() + i);
+                    const ts = t.toISOString().slice(0, 10);
+                    if (matchDate(ts)) {
+                        allActivities.push({ ...a, kidName: kid.name, kidColor: color, displayDate: ts });
                     }
                 }
             }
-        };
-        console.log('Login handler attached successfully');
-    } else {
-        console.error('Login button not found!');
-    }
-    
-    // Redirect login button handler
-    if (redirectLoginBtn) {
-        redirectLoginBtn.onclick = () => {
-            console.log('Redirect login button clicked!');
-            tryRedirectSignIn();
-        };
-    }
-});
+        });
+    });
 
-// Alternative method - try redirect if popup doesn't work
-function tryRedirectSignIn() {
-    console.log('Trying redirect sign-in...');
-    auth.signInWithRedirect(googleProvider);
+    renderTimeline(allActivities, timelineList);
 }
 
-// Handle redirect result on page load
-auth.getRedirectResult().then((result) => {
-    if (result.user) {
-        console.log('Redirect login successful:', result.user);
-        showNotification(`ברוך הבא ${result.user.displayName}!`, "success");
+// ===== Render Timeline =====
+function renderTimeline(allActivities, timelineList) {
+    timelineList.innerHTML = '';
+
+    if (allActivities.length === 0) {
+        timelineList.innerHTML = `<div class="empty-state"><span class="empty-state-icon">📭</span><p>אין פעילויות להצגה</p></div>`;
+        el('whatsappShareBtn').disabled = true;
+        el('whatsappShareBtn').style.opacity = '0.4';
+        return;
     }
-}).catch((error) => {
-    console.error('Redirect login error:', error);
-});
 
+    allActivities.sort((a, b) =>
+        a.displayDate.localeCompare(b.displayDate) ||
+        (a.time || '99:99').localeCompare(b.time || '99:99')
+    );
 
+    let lastDate = '';
+    allActivities.forEach(act => {
+        if (currentView === 'weekly' && act.displayDate !== lastDate) {
+            const header = document.createElement('div');
+            header.className = 'timeline-day-header';
+            header.textContent = `${hebrewDay(act.displayDate)} ${formatDate(act.displayDate)}`;
+            timelineList.appendChild(header);
+            lastDate = act.displayDate;
+        }
 
-// Event Listeners for UI controls
-document.getElementById("viewDaily").onclick = () => { 
-    currentTimelineView = 'daily'; 
-    updateUI(); 
-    if (userKidsRef) userKidsRef.once("value", s => renderKids(s.val())); 
-};
+        const item = document.createElement('div');
+        item.className = 'timeline-item';
+        item.style.borderRightColor = act.kidColor;
 
-document.getElementById("viewWeekly").onclick = () => { 
-    currentTimelineView = 'weekly'; 
-    updateUI(); 
-    if (userKidsRef) userKidsRef.once("value", s => renderKids(s.val())); 
-};
+        let icons = '';
+        if (act.isTransport) {
+            const style = act.isReturn ? 'display:inline-block;transform:scaleX(-1);filter:hue-rotate(150deg)' : 'display:inline-block';
+            icons += `<span style="${style}" title="${act.isReturn ? 'הסעה חזור' : 'הסעה הלוך'}">🚗</span>`;
+        }
+        if (act.repeatWeekly) icons += ' 🔁';
+        if (act.isPermanent)  icons += ' 📌';
 
-document.getElementById("refreshBtn").onclick = () => {
-    if (userKidsRef) userKidsRef.once("value", snap => renderKids(snap.val()));
-};
+        item.innerHTML = `
+            <span class="timeline-time">${formatTimeRange(act.time, act.endTime)}</span>
+            <span class="timeline-content">
+                <span class="timeline-kid-name" style="background:${act.kidColor}">${act.kidName}</span>
+                ${act.title} ${icons}
+            </span>`;
+        timelineList.appendChild(item);
+    });
 
-document.getElementById("closeModal").onclick = () => 
-    document.getElementById("modalBackdrop").style.display = "none";
+    el('whatsappShareBtn').disabled = false;
+    el('whatsappShareBtn').style.opacity = '1';
+}
 
-// Logout button handler
-window.addEventListener('load', function() {
-    const logoutBtn = document.getElementById("logoutBtn");
-    if (logoutBtn) {
-        logoutBtn.onclick = () => {
-            showLoading(logoutBtn);
-            logoutBtn.disabled = true;
-            
-            auth.signOut()
-                .then(() => {
-                    console.log('Logout successful');
-                    hideLoading(logoutBtn);
-                    logoutBtn.disabled = false;
-                    showNotification("התנתקת בהצלחה", "success");
-                })
-                .catch((error) => {
-                    console.error('Logout error:', error);
-                    hideLoading(logoutBtn);
-                    logoutBtn.disabled = false;
-                    showNotification("שגיאה בהתנתקות", "error");
+// ===== Modal =====
+function openKidModal(kidId, kid, activityToEdit = null) {
+    const modalContent = el('modalContent');
+    const color = kidsColorMap[kidId] || '#6366f1';
+
+    // Title with color dot
+    el('modalTitle').innerHTML = `<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${color};margin-left:8px;vertical-align:middle;"></span>${activityToEdit ? 'עריכת פעילות' : kid.name}`;
+
+    modalContent.innerHTML = '';
+    el('modalBackdrop').style.display = 'flex';
+
+    const activities = Array.isArray(kid.activities) ? kid.activities : Object.values(kid.activities || {});
+
+    if (!activityToEdit) {
+        // Share button
+        const shareBtn = document.createElement('button');
+        shareBtn.className = 'btn-share-personal';
+        shareBtn.innerHTML = '<i class="fab fa-whatsapp"></i> שיתוף לוח אישי';
+        shareBtn.onclick = () => shareEntireKid(kidId, kid.name);
+        modalContent.appendChild(shareBtn);
+
+        // Activity list
+        const list = document.createElement('div');
+
+        if (activities.length === 0) {
+            list.innerHTML = '<div class="empty-state" style="padding:16px"><span class="empty-state-icon">📝</span><p>עדיין אין פעילויות</p></div>';
+        } else {
+            activities
+                .slice()
+                .sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+                .forEach(a => {
+                    const item = document.createElement('div');
+                    item.className = 'activity-item';
+
+                    const dateFmt = a.date ? `${formatDate(a.date)} ` : '';
+                    const icons   = `${a.isPermanent ? '📌' : ''}${a.isTransport ? '🚗' : ''}${a.repeatWeekly ? '🔁' : ''}`;
+
+                    const actKid = JSON.stringify(kid).replace(/"/g, '&quot;');
+                    const actA   = JSON.stringify(a).replace(/"/g, '&quot;');
+
+                    item.innerHTML = `
+                        <div class="activity-text">${dateFmt}${formatTimeRange(a.time, a.endTime)} <strong>${a.title}</strong> ${icons}</div>
+                        <div class="activity-actions">
+                            <button class="btn-link-share" onclick="event.stopPropagation();shareActivity('${kid.name}',${actA})" title="שיתוף">🔗</button>
+                            <button class="btn-edit"   onclick="event.stopPropagation();openKidModal('${kidId}',${actKid},${actA})" title="עריכה">✏️</button>
+                            <button class="btn-delete" onclick="event.stopPropagation();deleteActivity('${kidId}','${a.id}')" title="מחיקה">🗑️</button>
+                        </div>`;
+                    list.appendChild(item);
                 });
+        }
+        modalContent.appendChild(list);
+    }
+
+    // Add / Edit form
+    const form = document.createElement('div');
+    form.className = 'add-activity-form';
+    const dDate  = activityToEdit ? activityToEdit.date  : todayStr();
+    const dTime  = activityToEdit ? (activityToEdit.time    || '') : '';
+    const dEnd   = activityToEdit ? (activityToEdit.endTime || '') : '';
+    const dTitle = activityToEdit ? activityToEdit.title : '';
+
+    form.innerHTML = `
+        <h4>${activityToEdit ? '✏️ עריכת פעילות' : '➕ פעילות חדשה'}</h4>
+        <input type="date"  id="newActDate"  value="${dDate}" />
+        <input type="text"  id="newActTitle" placeholder="מה עושים?" value="${dTitle}" />
+        <div class="form-row">
+            <span class="time-label">משעה:</span>
+            <input type="time" id="newActTime"    style="flex:1" value="${dTime}">
+            <span class="time-label">עד:</span>
+            <input type="time" id="newActEndTime" style="flex:1" value="${dEnd}">
+        </div>
+        <div class="checkbox-grid" id="checkboxGrid">
+            <label class="checkbox-option ${activityToEdit?.isPermanent  ? 'checked' : ''}" data-cb="newActPerm">
+                <input type="checkbox" id="newActPerm"   ${activityToEdit?.isPermanent  ? 'checked' : ''}>📌 קבוע
+            </label>
+            <label class="checkbox-option ${activityToEdit?.repeatWeekly ? 'checked' : ''}" data-cb="newActRepeat">
+                <input type="checkbox" id="newActRepeat" ${activityToEdit?.repeatWeekly ? 'checked' : ''}>🔁 חוזר שבועי
+            </label>
+            <label class="checkbox-option ${activityToEdit?.isTransport  ? 'checked' : ''}" data-cb="newActTrans" id="transCbLabel">
+                <input type="checkbox" id="newActTrans"  ${activityToEdit?.isTransport  ? 'checked' : ''}>🚗 הסעה
+            </label>
+        </div>
+        <div id="returnOption" class="return-option" style="display:${activityToEdit?.isTransport ? 'block' : 'none'}">
+            <label class="checkbox-option ${activityToEdit?.isReturn ? 'checked' : ''}" data-cb="newActIsReturn">
+                <input type="checkbox" id="newActIsReturn" ${activityToEdit?.isReturn ? 'checked' : ''}>🏠 הסעה חזור (הביתה)
+            </label>
+        </div>
+        <button class="save-act-btn" id="saveActBtn">💾 שמור פעילות</button>
+    `;
+    modalContent.appendChild(form);
+
+    // Checkbox visual toggle
+    form.querySelectorAll('.checkbox-option').forEach(label => {
+        label.addEventListener('click', () => {
+            const cbId = label.dataset.cb;
+            const cb   = el(cbId);
+            if (!cb) return;
+            cb.checked = !cb.checked;
+            label.classList.toggle('checked', cb.checked);
+
+            // Show/hide return option when transport toggled
+            if (cbId === 'newActTrans') {
+                el('returnOption').style.display = cb.checked ? 'block' : 'none';
+                if (!cb.checked) {
+                    el('newActIsReturn').checked = false;
+                    el('returnOption').querySelector('.checkbox-option').classList.remove('checked');
+                }
+            }
+        });
+    });
+
+    el('saveActBtn').onclick = () => saveActivity(kidId, kid, activityToEdit, activities);
+}
+
+function saveActivity(kidId, kid, activityToEdit, activities) {
+    const title = el('newActTitle').value.trim();
+    const date  = el('newActDate').value;
+    if (!title || !date) { showNotification('חובה למלא תאריך וכותרת', 'error'); return; }
+
+    const newAct = {
+        id:          activityToEdit ? activityToEdit.id : 'a_' + Date.now(),
+        title,
+        date,
+        time:        el('newActTime').value    || '',
+        endTime:     el('newActEndTime').value || '',
+        isPermanent: el('newActPerm').checked,
+        repeatWeekly:el('newActRepeat').checked,
+        isTransport: el('newActTrans').checked,
+        isReturn:    el('newActIsReturn') ? el('newActIsReturn').checked : false,
+    };
+
+    const newList = activityToEdit
+        ? activities.map(a => a.id === activityToEdit.id ? newAct : a)
+        : [...activities, newAct];
+
+    userKidsRef.child(kidId).child('activities').set(newList)
+        .then(() => {
+            showNotification(activityToEdit ? 'הפעילות עודכנה ✓' : 'הפעילות נוספה ✓', 'success');
+            userKidsRef.child(kidId).once('value', s => openKidModal(kidId, s.val()));
+        })
+        .catch(err => {
+            console.error(err);
+            showNotification('שגיאה בשמירה', 'error');
+        });
+}
+
+// ===== Delete Activity =====
+window.deleteActivity = (kidId, actId) => {
+    if (!confirm('למחוק את הפעילות?')) return;
+    userKidsRef.child(kidId).child('activities').once('value', snap => {
+        const list     = snap.val() || [];
+        const filtered = list.filter(a => String(a.id) !== String(actId));
+        userKidsRef.child(kidId).child('activities').set(filtered)
+            .then(() => {
+                showNotification('הפעילות נמחקה', 'error');
+                userKidsRef.child(kidId).once('value', s => {
+                    if (s.exists()) openKidModal(kidId, s.val());
+                    else el('modalBackdrop').style.display = 'none';
+                });
+            })
+            .catch(err => console.error('מחיקה נכשלה:', err));
+    });
+};
+
+// ===== Share =====
+window.shareActivity = (kidName, a) => {
+    const data = btoa(unescape(encodeURIComponent(JSON.stringify(a))));
+    const url  = `${location.origin}${location.pathname}?sharedAct=${data}`;
+    const txt  = `פעילות עבור ${kidName}: ${a.title}. להוספה: ${url}`;
+    if (navigator.share) navigator.share({ title: 'שיתוף פעילות', text: txt, url });
+    else { navigator.clipboard.writeText(txt); showNotification('הועתק ללוח!', 'info'); }
+};
+
+function shareEntireKid(kidId, kidName) {
+    userKidsRef.child(kidId).once('value', snap => {
+        const data = btoa(unescape(encodeURIComponent(JSON.stringify(snap.val()))));
+        const url  = `${location.origin}${location.pathname}?sharedKid=${data}`;
+        if (navigator.share) navigator.share({ title: kidName, url });
+        else { navigator.clipboard.writeText(url); showNotification('קישור הועתק!', 'info'); }
+    });
+}
+
+// ===== WhatsApp Share =====
+function buildWhatsappMessage() {
+    const items = document.querySelectorAll('.timeline-item');
+    if (!items.length) return null;
+
+    const dateVal  = el('dateFilter').value || todayStr();
+    const dateDisp = currentView === 'daily'
+        ? `${hebrewDay(dateVal)} ${formatDate(dateVal)}`
+        : `שבוע מ-${formatDate(dateVal)}`;
+
+    let msg = `*📅 לו"ז ${appSettings.title} — ${dateDisp}*\n\n`;
+
+    document.querySelectorAll('.timeline-day-header, .timeline-item').forEach(node => {
+        if (node.classList.contains('timeline-day-header')) {
+            msg += `\n*${node.textContent.trim()}*\n`;
+        } else {
+            const time    = node.querySelector('.timeline-time')?.textContent?.trim() || '';
+            const content = node.querySelector('.timeline-content')?.textContent?.trim().replace(/\s+/g, ' ') || '';
+            msg += `⏰ ${time}  ${content}\n`;
+        }
+    });
+
+    return msg;
+}
+
+// ===== Date filter auto-refresh =====
+let _dateChangeTimer = null;
+
+// ===== Event Listeners — DOM Ready =====
+document.addEventListener('DOMContentLoaded', () => {
+    // Initialize date
+    const df = el('dateFilter');
+    if (df) df.value = todayStr();
+
+    // Filter dropdown
+    const filterBtn  = el('filterDropdownBtn');
+    const filterMenu = el('filterMenu');
+
+    if (filterBtn) {
+        filterBtn.onclick = e => {
+            e.stopPropagation();
+            filterMenu.style.display = filterMenu.style.display === 'none' ? 'block' : 'none';
         };
     }
-    
-    const addKidBtn = document.getElementById("addKidBtn");
+    document.onclick = () => { if (filterMenu) filterMenu.style.display = 'none'; };
+    if (filterMenu) filterMenu.onclick = e => e.stopPropagation();
+
+    document.querySelectorAll('.filter-check').forEach(cb => {
+        cb.onchange = () => {
+            activeFilters = Array.from(document.querySelectorAll('.filter-check:checked')).map(c => c.value);
+            if (userKidsRef) userKidsRef.once('value', s => renderKids(s.val()));
+        };
+    });
+
+    // Date change — debounced
+    if (df) {
+        df.onchange = () => {
+            clearTimeout(_dateChangeTimer);
+            _dateChangeTimer = setTimeout(() => {
+                if (userKidsRef) userKidsRef.once('value', s => renderKids(s.val()));
+            }, 200);
+        };
+    }
+});
+
+// ===== Event Listeners — Window Load =====
+window.addEventListener('load', () => {
+    // Login
+    const loginBtn = el('loginBtn');
+    if (loginBtn) {
+        loginBtn.onclick = async e => {
+            e.preventDefault();
+            if (loginBtn.disabled) return;
+            loginBtn.disabled = true;
+            showLoading(loginBtn);
+            try {
+                await auth.signInWithPopup(googleProvider);
+            } catch (err) {
+                hideLoading(loginBtn);
+                loginBtn.disabled = false;
+                if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') return;
+                if (err.code === 'auth/popup-blocked') {
+                    el('redirectLoginBtn').style.display = 'inline-flex';
+                    showNotification('הדפדפן חסם את הפופאפ — נסי "התחברות בדף חדש"', 'error');
+                } else {
+                    showNotification('שגיאה בהתחברות', 'error');
+                    el('redirectLoginBtn').style.display = 'inline-flex';
+                }
+            }
+        };
+    }
+
+    // Redirect login
+    const redirectLoginBtn = el('redirectLoginBtn');
+    if (redirectLoginBtn) {
+        redirectLoginBtn.onclick = () => auth.signInWithRedirect(googleProvider);
+    }
+
+    // Logout
+    const logoutBtn = el('logoutBtn');
+    if (logoutBtn) {
+        logoutBtn.onclick = () => {
+            logoutBtn.disabled = true;
+            auth.signOut()
+                .then(() => { showNotification('התנתקת בהצלחה', 'info'); logoutBtn.disabled = false; })
+                .catch(() => { showNotification('שגיאה בהתנתקות', 'error'); logoutBtn.disabled = false; });
+        };
+    }
+
+    // Add kid / entity
+    const addKidBtn = el('addKidBtn');
     if (addKidBtn) {
         addKidBtn.onclick = () => {
             const name = prompt(`שם ה${appSettings.entityName}:`);
-            if (name && userKidsRef) {
+            if (name && name.trim() && userKidsRef) {
                 const ref = userKidsRef.push();
-                ref.set({ id: ref.key, name, activities: [] });
+                ref.set({ id: ref.key, name: name.trim(), activities: [] })
+                   .then(() => showNotification(`${name} נוסף/ה! 🎉`, 'success'));
             }
         };
     }
-    
-    const whatsappShareBtn = document.getElementById("whatsappShareBtn");
-    if (whatsappShareBtn) {
-        whatsappShareBtn.onclick = () => {
-            const items = document.querySelectorAll(".timeline-item");
-            if (items.length === 0) {
-                showNotification("אין פעילויות לשיתוף", "error");
-                return;
-            }
-            let msg = `*📅 לו"ז ${appSettings.title}:*\n`;
-            Array.from(document.getElementById("timeline-list").children).forEach(el => {
-                if (el.style.fontWeight === "bold") msg += `\n*${el.textContent}*\n`;
-                else msg += `⏰ ${el.querySelector(".timeline-time").textContent} - ${el.querySelector(".timeline-content").textContent.trim()}\n`;
-            });
+
+    // View toggles
+    el('viewDaily').onclick = () => {
+        currentView = 'daily';
+        updateUI();
+        if (userKidsRef) userKidsRef.once('value', s => renderKids(s.val()));
+    };
+    el('viewWeekly').onclick = () => {
+        currentView = 'weekly';
+        updateUI();
+        if (userKidsRef) userKidsRef.once('value', s => renderKids(s.val()));
+    };
+
+    // Refresh
+    el('refreshBtn').onclick = () => {
+        if (userKidsRef) userKidsRef.once('value', s => renderKids(s.val()));
+        showNotification('מתרענן...', 'info');
+    };
+
+    // Close modal
+    el('closeModal').onclick = () => {
+        el('modalBackdrop').style.display = 'none';
+    };
+    el('modalBackdrop').addEventListener('click', e => {
+        if (e.target === el('modalBackdrop')) el('modalBackdrop').style.display = 'none';
+    });
+
+    // WhatsApp share
+    const waBtn = el('whatsappShareBtn');
+    if (waBtn) {
+        waBtn.onclick = () => {
+            const msg = buildWhatsappMessage();
+            if (!msg) { showNotification('אין פעילויות לשיתוף', 'error'); return; }
             window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, '_blank');
-            showNotification("נפתח בוואטסאפ!", "success");
+            showNotification('נפתח בוואטסאפ! 📱', 'success');
         };
     }
-    
-    // Settings functionality
-    const settingsBtn = document.getElementById("settingsBtn");
+
+    // Settings open
+    const settingsBtn = el('settingsBtn');
     if (settingsBtn) {
         settingsBtn.onclick = () => {
-            document.getElementById("settingsTitle").value = appSettings.title || "הלוח שלי";
-            document.getElementById("settingsEntityName").value = appSettings.entityName || "פעילויות";
-            document.getElementById("settingsDefaultView").value = appSettings.defaultView || "daily";
-            document.getElementById("settingsModalBackdrop").style.display = "flex";
+            el('settingsTitle').value       = appSettings.title       || 'הלוח שלי';
+            el('settingsEntityName').value  = appSettings.entityName  || 'פעילויות';
+            el('settingsDefaultView').value = appSettings.defaultView || 'daily';
+            el('settingsModalBackdrop').style.display = 'flex';
         };
     }
-    
-    const saveSettingsBtn = document.getElementById("saveSettingsBtn");
+
+    // Settings save
+    const saveSettingsBtn = el('saveSettingsBtn');
     if (saveSettingsBtn) {
         saveSettingsBtn.onclick = () => {
             const newSettings = {
-                title: document.getElementById("settingsTitle").value || "הלוח שלי",
-                entityName: document.getElementById("settingsEntityName").value || "פעילויות",
-                defaultView: document.getElementById("settingsDefaultView").value || "daily"
+                title:       el('settingsTitle').value       || 'הלוח שלי',
+                entityName:  el('settingsEntityName').value  || 'פעילויות',
+                defaultView: el('settingsDefaultView').value || 'daily',
             };
-            
             if (userSettingsRef) {
                 showLoading(saveSettingsBtn);
-                userSettingsRef.set(newSettings).then(() => {
-                    appSettings = newSettings;
-                    updateUI();
-                    document.getElementById("settingsModalBackdrop").style.display = "none";
-                    hideLoading(saveSettingsBtn);
-                    showNotification("הגדרות נשמרו בהצלחה!", "success");
-                }).catch(error => {
-                    hideLoading(saveSettingsBtn);
-                    showNotification("שגיאה בשמירת הגדרות", "error");
-                    console.error("Error saving settings:", error);
-                });
+                userSettingsRef.set(newSettings)
+                    .then(() => {
+                        appSettings = newSettings;
+                        updateUI();
+                        el('settingsModalBackdrop').style.display = 'none';
+                        hideLoading(saveSettingsBtn);
+                        showNotification('הגדרות נשמרו ✓', 'success');
+                    })
+                    .catch(() => {
+                        hideLoading(saveSettingsBtn);
+                        showNotification('שגיאה בשמירת הגדרות', 'error');
+                    });
             }
         };
     }
 });
 
-// Enhanced error handling
-window.addEventListener('error', function(e) {
-    console.error('JavaScript Error:', e.error);
-    showNotification("אירעה שגיאה. אנא נסה שוב.", "error");
+// ===== Redirect result =====
+auth.getRedirectResult()
+    .then(result => {
+        if (result.user) showNotification(`ברוכה הבאה, ${result.user.displayName}! 🎉`, 'success');
+    })
+    .catch(err => console.error('Redirect error:', err));
+
+// ===== Global error handler =====
+window.addEventListener('error', e => {
+    console.error('JS Error:', e.error);
 });
-
-// Add smooth scrolling to new items
-function smoothScrollToElement(element) {
-    element.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'nearest',
-        inline: 'nearest'
-    });
-}
-
