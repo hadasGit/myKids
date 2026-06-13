@@ -123,10 +123,15 @@
 
 </div><!-- /app-container -->
 
-<!-- Floating Add Button -->
-<button id="addKidBtn" class="add-kid-btn" style="display:none;">
-    <i class="fas fa-plus"></i> הוספת פעילות
-</button>
+<!-- Floating Buttons -->
+<div class="fab-group" id="fabGroup" style="display:none;">
+    <button id="voiceBtn" class="fab-voice-btn" title="הוספה קולית">
+        <i class="fas fa-microphone"></i>
+    </button>
+    <button id="addKidBtn" class="add-kid-btn">
+        <i class="fas fa-plus"></i> הוספת פעילות
+    </button>
+</div>
 
 <!-- ====== ACTIVITY MODAL (Bottom Sheet) ====== -->
 <div id="modalBackdrop" class="modal-backdrop">
@@ -186,10 +191,10 @@
 // (handled inside script.js — this ensures addKidBtn only shows when logged in)
 document.addEventListener('DOMContentLoaded', () => {
     const obs = new MutationObserver(() => {
-        const mc = document.getElementById('main-content');
-        const fab = document.getElementById('addKidBtn');
-        if (mc && fab) {
-            fab.style.display = mc.style.display === 'block' ? 'flex' : 'none';
+        const mc  = document.getElementById('main-content');
+        const grp = document.getElementById('fabGroup');
+        if (mc && grp) {
+            grp.style.display = mc.style.display === 'block' ? 'flex' : 'none';
         }
     });
     const mc = document.getElementById('main-content');

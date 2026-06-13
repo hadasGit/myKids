@@ -261,14 +261,14 @@ function renderKids(kids) {
 
             if (currentView === 'daily') {
                 if (matchDate(selectedDate)) {
-                    allActivities.push({ ...a, kidName: kid.name, kidColor: color, displayDate: selectedDate });
+                    allActivities.push({ ...a, kidId, kidName: kid.name, kidColor: color, displayDate: selectedDate });
                 }
             } else {
                 for (let i = 0; i < 7; i++) {
                     const t  = new Date(baseDate); t.setDate(baseDate.getDate() + i);
                     const ts = t.toISOString().slice(0, 10);
                     if (matchDate(ts)) {
-                        allActivities.push({ ...a, kidName: kid.name, kidColor: color, displayDate: ts });
+                        allActivities.push({ ...a, kidId, kidName: kid.name, kidColor: color, displayDate: ts });
                     }
                 }
             }
@@ -316,13 +316,33 @@ function renderTimeline(allActivities, timelineList) {
         if (act.repeatWeekly) icons += ' 🔁';
         if (act.isPermanent)  icons += ' 📌';
 
+        const isDone = act.isDone === true;
+        if (isDone) item.classList.add('timeline-item-done');
+
         item.innerHTML = `
             <span class="timeline-time">${formatTimeRange(act.time, act.endTime)}</span>
             <span class="timeline-content">
                 <span class="timeline-kid-name" style="background:${act.kidColor}">${act.kidName}</span>
                 ${act.title} ${icons}
-            </span>`;
+            </span>
+            <span class="swipe-hint-done" title="החלק ימינה לסיום">✅</span>`;
         timelineList.appendChild(item);
+
+        // Swipe: right = toggle done, left = open edit modal
+        if (act.kidId && act.id) {
+            addSwipeListeners(item,
+                () => { // swipe right → toggle done
+                    markActivityDone(act.kidId, act.id, !isDone);
+                },
+                () => { // swipe left → open edit
+                    if (userKidsRef && act.kidId) {
+                        userKidsRef.child(act.kidId).once('value', snap => {
+                            if (snap.exists()) openKidModal(act.kidId, snap.val(), act);
+                        });
+                    }
+                }
+            );
+        }
     });
 
     el('whatsappShareBtn').disabled = false;
@@ -392,6 +412,13 @@ function openKidModal(kidId, kid, activityToEdit = null) {
 
     form.innerHTML = `
         <h4>${activityToEdit ? '✏️ עריכת פעילות' : '➕ פעילות חדשה'}</h4>
+        ${!activityToEdit ? `
+        <div class="smart-input-wrap">
+            <textarea id="smartTextInput" class="smart-text-input" placeholder="✍️ כתוב בחופשיות... למשל: נועה ריפוי בעיסוק שני 16:00 חוזר" rows="2"></textarea>
+            <button type="button" id="smartParseBtn" class="btn-smart-parse">⚡ מלא אוטומטי</button>
+        </div>
+        <div class="smart-divider"><span>או מלא ידנית</span></div>
+        ` : ''}
         <input type="date"  id="newActDate"  value="${dDate}" />
         <input type="text"  id="newActTitle" placeholder="מה עושים?" value="${dTitle}" />
         <div class="form-row">
@@ -439,6 +466,50 @@ function openKidModal(kidId, kid, activityToEdit = null) {
             }
         });
     });
+
+    // Smart parse button
+    const smartBtn = el('smartParseBtn');
+    if (smartBtn) {
+        smartBtn.onclick = () => {
+            const text = el('smartTextInput').value.trim();
+            if (!text) return;
+
+            // Build kidsList from current snapshot
+            const kidsList = [];
+            if (userKidsRef) {
+                userKidsRef.once('value', snap => {
+                    const allKids = snap.val() || {};
+                    Object.entries(allKids).forEach(([id, k]) => kidsList.push({ id, name: k.name }));
+                    applyParsed(parseActivityText(text, kidsList));
+                });
+            } else {
+                applyParsed(parseActivityText(text, []));
+            }
+        };
+    }
+
+    function applyParsed(parsed) {
+        if (parsed.title)  el('newActTitle').value = parsed.title;
+        if (parsed.date)   el('newActDate').value  = parsed.date;
+        if (parsed.time)   el('newActTime').value  = parsed.time;
+        if (parsed.endTime) el('newActEndTime').value = parsed.endTime;
+
+        // Checkboxes
+        const setCheck = (id, val) => {
+            const cb = el(id);
+            const label = cb?.closest('.checkbox-option');
+            if (!cb) return;
+            cb.checked = val;
+            label?.classList.toggle('checked', val);
+        };
+        setCheck('newActRepeat', parsed.repeatWeekly);
+        setCheck('newActPerm',   parsed.isPermanent);
+        setCheck('newActTrans',  parsed.isTransport);
+        if (el('newActIsReturn')) setCheck('newActIsReturn', parsed.isReturn);
+        if (el('returnOption'))   el('returnOption').style.display = parsed.isTransport ? 'block' : 'none';
+
+        showNotification('שדות מולאו אוטומטית ✓', 'success');
+    }
 
     el('saveActBtn').onclick = () => saveActivity(kidId, kid, activityToEdit, activities);
 }
@@ -720,3 +791,369 @@ auth.getRedirectResult()
 window.addEventListener('error', e => {
     console.error('JS Error:', e.error);
 });
+
+// ===== SMART TEXT PARSER =====
+// Parses free Hebrew text into activity fields.
+// Returns: { kidId, title, date, time, endTime, repeatWeekly, isTransport, isReturn, isPermanent }
+// kidsList = array of { id, name } from Firebase snapshot
+
+const HEBREW_DAYS = {
+    'ראשון':  0, 'יום ראשון':  0,
+    'שני':    1, 'יום שני':    1,
+    'שלישי':  2, 'יום שלישי':  2,
+    'רביעי':  3, 'יום רביעי':  3,
+    'חמישי':  4, 'יום חמישי':  4,
+    'שישי':   5, 'יום שישי':   5,
+    'שבת':    6, 'יום שבת':    6,
+};
+
+const HEBREW_HOUR_WORDS = {
+    'אחת':    1, 'שתיים':  2, 'שתים':   2,
+    'שלוש':   3, 'ארבע':   4, 'חמש':    5,
+    'שש':     6, 'שבע':    7, 'שמונה':  8,
+    'תשע':    9, 'עשר':   10, 'אחת עשרה': 11,
+    'שתים עשרה': 12, 'שנים עשרה': 12,
+};
+
+function parseActivityText(text, kidsList = []) {
+    const result = {
+        kidId:        null,
+        title:        '',
+        date:         todayStr(),
+        time:         '',
+        endTime:      '',
+        repeatWeekly: false,
+        isTransport:  false,
+        isReturn:     false,
+        isPermanent:  false,
+    };
+
+    let remaining = text.trim();
+
+    // --- 1. Find kid name ---
+    if (kidsList.length > 0) {
+        // Sort longest name first to avoid partial matches
+        const sorted = [...kidsList].sort((a, b) => b.name.length - a.name.length);
+        for (const kid of sorted) {
+            if (remaining.includes(kid.name)) {
+                result.kidId = kid.id;
+                remaining = remaining.replace(kid.name, '').trim();
+                break;
+            }
+        }
+    }
+
+    // --- 2. Flags ---
+    if (/חוזר|כל שבוע|שבועי|🔁/.test(remaining)) {
+        result.repeatWeekly = true;
+        remaining = remaining.replace(/חוזר|כל שבוע|שבועי|🔁/g, '').trim();
+    }
+    if (/קבוע|תמידי|📌/.test(remaining)) {
+        result.isPermanent = true;
+        remaining = remaining.replace(/קבוע|תמידי|📌/g, '').trim();
+    }
+    if (/חזרה|חזור|הביתה/.test(remaining)) {
+        result.isTransport = true;
+        result.isReturn = true;
+        remaining = remaining.replace(/חזרה|חזור|הביתה/g, '').trim();
+    } else if (/הסעה|מסיעה|🚗/.test(remaining)) {
+        result.isTransport = true;
+        remaining = remaining.replace(/הסעה|מסיעה|🚗/g, '').trim();
+    }
+
+    // --- 3. Day → date ---
+    for (const [word, dayIndex] of Object.entries(HEBREW_DAYS)) {
+        if (remaining.includes(word)) {
+            result.date = nextWeekdayDate(dayIndex);
+            remaining = remaining.replace(word, '').trim();
+            break;
+        }
+    }
+    // "היום" / "מחר" / "מחרתיים"
+    if (/\bהיום\b/.test(remaining)) {
+        result.date = todayStr();
+        remaining = remaining.replace(/\bהיום\b/, '').trim();
+    } else if (/\bמחר\b/.test(remaining)) {
+        const d = new Date(); d.setDate(d.getDate() + 1);
+        result.date = d.toISOString().slice(0, 10);
+        remaining = remaining.replace(/\bמחר\b/, '').trim();
+    }
+
+    // --- 4. Time ---
+    // "16:30 עד 17:00" or "16:00"
+    const timeRangeMatch = remaining.match(/(\d{1,2}:\d{2})\s*(?:עד|-)\s*(\d{1,2}:\d{2})/);
+    if (timeRangeMatch) {
+        result.time    = padTime(timeRangeMatch[1]);
+        result.endTime = padTime(timeRangeMatch[2]);
+        remaining = remaining.replace(timeRangeMatch[0], '').trim();
+    } else {
+        const timeMatch = remaining.match(/(\d{1,2}:\d{2})/);
+        if (timeMatch) {
+            result.time = padTime(timeMatch[1]);
+            remaining = remaining.replace(timeMatch[0], '').trim();
+        } else {
+            // "16 וחצי" / "ארבע וחצי" / "ארבע ורבע"
+            const halfMatch = remaining.match(/(\d{1,2})\s*(וחצי|וחצ'|וחצ)/);
+            if (halfMatch) {
+                result.time = padTime(`${halfMatch[1]}:30`);
+                remaining = remaining.replace(halfMatch[0], '').trim();
+            } else {
+                const quarterMatch = remaining.match(/(\d{1,2})\s*(ורבע)/);
+                if (quarterMatch) {
+                    result.time = padTime(`${quarterMatch[1]}:15`);
+                    remaining = remaining.replace(quarterMatch[0], '').trim();
+                } else {
+                    // Word-based hours
+                    for (const [word, h] of Object.entries(HEBREW_HOUR_WORDS)) {
+                        const r = new RegExp(`\\b${word}\\b`);
+                        if (r.test(remaining)) {
+                            const halfW = new RegExp(`\\b${word}\\s+וחצי\\b`);
+                            if (halfW.test(remaining)) {
+                                result.time = `${String(h).padStart(2,'0')}:30`;
+                                remaining = remaining.replace(halfW, '').trim();
+                            } else {
+                                result.time = `${String(h).padStart(2,'0')}:00`;
+                                remaining = remaining.replace(r, '').trim();
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // --- 5. Remaining = title (clean up punctuation/extra spaces) ---
+    result.title = remaining
+        .replace(/[—–\-,،.]+/g, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+
+    return result;
+}
+
+// Helper: next occurrence of weekday (0=Sun … 6=Sat), from today
+function nextWeekdayDate(targetDay) {
+    const today = new Date();
+    const todayDay = today.getDay();
+    let diff = targetDay - todayDay;
+    if (diff < 0) diff += 7;
+    if (diff === 0) diff = 7; // "שני" when today IS Monday → next Monday
+    const d = new Date(today);
+    d.setDate(today.getDate() + diff);
+    return d.toISOString().slice(0, 10);
+}
+
+// Helper: "9:5" → "09:05"
+function padTime(t) {
+    const [h, m] = t.split(':');
+    return `${h.padStart(2,'0')}:${m.padStart(2,'0')}`;
+}
+
+// Expose for use by voice module and modal
+window.parseActivityText = parseActivityText;
+
+// ===== SWIPE TO COMPLETE =====
+function addSwipeListeners(element, onSwipeRight, onSwipeLeft) {
+    let startX = null;
+    let startY = null;
+    const THRESHOLD = 50; // px
+    const ANGLE_LIMIT = 35; // degrees — avoid triggering on vertical scroll
+
+    element.addEventListener('touchstart', e => {
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+    }, { passive: true });
+
+    element.addEventListener('touchend', e => {
+        if (startX === null) return;
+        const dx = e.changedTouches[0].clientX - startX;
+        const dy = e.changedTouches[0].clientY - startY;
+        startX = null;
+        startY = null;
+
+        if (Math.abs(dy) > Math.abs(dx) * Math.tan((ANGLE_LIMIT * Math.PI) / 180)) return; // too vertical
+        if (Math.abs(dx) < THRESHOLD) return;
+
+        if (dx > 0) onSwipeRight();
+        else        onSwipeLeft();
+    }, { passive: true });
+}
+
+function markActivityDone(kidId, actId, isDone) {
+    userKidsRef.child(kidId).child('activities').once('value', snap => {
+        const list = snap.val() || [];
+        const arr  = Array.isArray(list) ? list : Object.values(list);
+        const updated = arr.map(a => String(a.id) === String(actId) ? { ...a, isDone } : a);
+        userKidsRef.child(kidId).child('activities').set(updated)
+            .then(() => showNotification(isDone ? '✅ סומן כבוצע' : 'סימון הוסר', 'success'))
+            .catch(() => showNotification('שגיאה', 'error'));
+    });
+}
+
+// ===== VOICE INPUT =====
+(function initVoice() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    window.addEventListener('load', () => {
+        const voiceBtn = el('voiceBtn');
+        if (!voiceBtn) return;
+
+        if (!SpeechRecognition) {
+            // Browser doesn't support — hide button silently
+            voiceBtn.style.display = 'none';
+            return;
+        }
+
+        const recog = new SpeechRecognition();
+        recog.lang = 'he-IL';
+        recog.interimResults = false;
+        recog.maxAlternatives = 1;
+
+        let isListening = false;
+
+        voiceBtn.onclick = () => {
+            if (isListening) { recog.stop(); return; }
+            recog.start();
+        };
+
+        recog.onstart = () => {
+            isListening = true;
+            voiceBtn.classList.add('listening');
+            showNotification('🎙️ מקשיב... דבר עכשיו', 'info');
+        };
+
+        recog.onend = () => {
+            isListening = false;
+            voiceBtn.classList.remove('listening');
+        };
+
+        recog.onerror = (e) => {
+            isListening = false;
+            voiceBtn.classList.remove('listening');
+            if (e.error === 'no-speech') {
+                showNotification('לא נשמע כלום. נסי שוב 🎤', 'error');
+            } else if (e.error === 'not-allowed') {
+                showNotification('נא לאפשר גישה למיקרופון', 'error');
+            } else {
+                showNotification('שגיאה בזיהוי קול', 'error');
+            }
+        };
+
+        recog.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            showVoiceConfirmation(transcript);
+        };
+    });
+
+    function showVoiceConfirmation(transcript) {
+        // Build kidsList then parse
+        const kidsList = [];
+        if (userKidsRef) {
+            userKidsRef.once('value', snap => {
+                const allKids = snap.val() || {};
+                Object.entries(allKids).forEach(([id, k]) => kidsList.push({ id, name: k.name }));
+                const parsed = parseActivityText(transcript, kidsList);
+                renderVoiceConfirmModal(transcript, parsed, kidsList);
+            });
+        } else {
+            renderVoiceConfirmModal(transcript, parseActivityText(transcript, []), []);
+        }
+    }
+
+    function renderVoiceConfirmModal(transcript, parsed, kidsList) {
+        const modalContent = el('modalContent');
+        el('modalTitle').innerHTML = '🎙️ זיהוי קולי';
+        modalContent.innerHTML = '';
+        el('modalBackdrop').style.display = 'flex';
+
+        // Show what was heard
+        const heard = document.createElement('div');
+        heard.className = 'voice-heard';
+        heard.innerHTML = `<span class="voice-heard-label">נשמע:</span> <em>"${transcript}"</em>`;
+        modalContent.appendChild(heard);
+
+        // Summary of parsed fields
+        const kidName = kidsList.find(k => k.id === parsed.kidId)?.name || '—';
+        const summary = document.createElement('div');
+        summary.className = 'voice-summary';
+        summary.innerHTML = `
+            <div class="voice-field"><span>👤 ילד/ה</span><strong>${kidName}</strong></div>
+            <div class="voice-field"><span>📝 פעילות</span><strong>${parsed.title || '—'}</strong></div>
+            <div class="voice-field"><span>📅 תאריך</span><strong>${parsed.date}</strong></div>
+            <div class="voice-field"><span>⏰ שעה</span><strong>${parsed.time || '—'}</strong></div>
+            ${parsed.repeatWeekly ? '<div class="voice-field"><span>🔁</span><strong>חוזר שבועי</strong></div>' : ''}
+            ${parsed.isTransport  ? '<div class="voice-field"><span>🚗</span><strong>הסעה</strong></div>' : ''}
+        `;
+        modalContent.appendChild(summary);
+
+        // If no kid found and there are kids, show selector
+        if (!parsed.kidId && kidsList.length > 0) {
+            const kidSel = document.createElement('div');
+            kidSel.className = 'voice-kid-select';
+            kidSel.innerHTML = `<label style="font-size:0.88rem;font-weight:600;color:var(--text-secondary)">בחרי ילד/ה:</label>`;
+            const sel = document.createElement('select');
+            sel.className = 'date-input';
+            sel.innerHTML = `<option value="">— בחרי —</option>` +
+                kidsList.map(k => `<option value="${k.id}">${k.name}</option>`).join('');
+            sel.onchange = () => { parsed.kidId = sel.value; };
+            kidSel.appendChild(sel);
+            modalContent.appendChild(kidSel);
+        }
+
+        // Action buttons
+        const actions = document.createElement('div');
+        actions.className = 'voice-actions';
+
+        const saveBtn = document.createElement('button');
+        saveBtn.className = 'save-act-btn';
+        saveBtn.textContent = '✅ שמור';
+        saveBtn.onclick = () => {
+            if (!parsed.kidId) { showNotification('בחרי ילד/ה קודם', 'error'); return; }
+            if (!parsed.title) { showNotification('לא זוהתה פעילות', 'error'); return; }
+            // Build activity and save directly
+            const newAct = {
+                id:           'a_' + Date.now(),
+                title:        parsed.title,
+                date:         parsed.date,
+                time:         parsed.time,
+                endTime:      parsed.endTime,
+                isPermanent:  parsed.isPermanent,
+                repeatWeekly: parsed.repeatWeekly,
+                isTransport:  parsed.isTransport,
+                isReturn:     parsed.isReturn,
+            };
+            userKidsRef.child(parsed.kidId).child('activities').once('value', snap => {
+                const list = snap.val() || [];
+                const arr  = Array.isArray(list) ? list : Object.values(list);
+                userKidsRef.child(parsed.kidId).child('activities').set([...arr, newAct])
+                    .then(() => {
+                        el('modalBackdrop').style.display = 'none';
+                        showNotification('הפעילות נוספה ✓', 'success');
+                    })
+                    .catch(() => showNotification('שגיאה בשמירה', 'error'));
+            });
+        };
+
+        const editBtn = document.createElement('button');
+        editBtn.className = 'btn-outline';
+        editBtn.style.cssText = 'margin-top:8px;';
+        editBtn.textContent = '✏️ ערוך ידנית';
+        editBtn.onclick = () => {
+            // Open regular modal pre-filled
+            if (!parsed.kidId) { showNotification('בחרי ילד/ה קודם', 'error'); return; }
+            userKidsRef.child(parsed.kidId).once('value', snap => {
+                const kid = snap.val();
+                openKidModal(parsed.kidId, kid, {
+                    ...parsed,
+                    id: 'a_' + Date.now(),
+                    _prefill: true,
+                });
+            });
+        };
+
+        actions.appendChild(saveBtn);
+        actions.appendChild(editBtn);
+        modalContent.appendChild(actions);
+    }
+})();
