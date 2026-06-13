@@ -175,6 +175,21 @@
                     </select>
                 </div>
                 <button id="saveSettingsBtn" class="btn-primary">💾 שמירת הגדרות</button>
+
+                <div class="settings-divider"></div>
+
+                <div class="form-group">
+                    <label>👨‍👩‍👧 שיתוף עם הורה נוסף</label>
+                    <div id="linkedParentStatus" class="linked-parent-status">בודק...</div>
+                    <div style="display:flex;gap:8px;margin-top:8px;">
+                        <input type="email" id="shareParentEmail" placeholder="אימייל של ההורה השני" style="flex:1;">
+                        <button id="shareParentBtn" class="btn-icon" title="שלח הזמנה" style="width:auto;padding:0 14px;border-radius:var(--radius-sm);">שלח</button>
+                    </div>
+                    <div id="shareParentMsg" style="font-size:0.82rem;margin-top:6px;color:var(--text-secondary);"></div>
+                </div>
+                <div class="form-group" id="unlinkParentWrap" style="display:none;">
+                    <button id="unlinkParentBtn" class="btn-outline" style="color:var(--danger);border-color:var(--danger);">🔓 נתק שיתוף</button>
+                </div>
             </div>
         </div>
     </div>

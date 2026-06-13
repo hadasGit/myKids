@@ -942,6 +942,18 @@ body {
 
 .settings-form { display: flex; flex-direction: column; gap: 20px; }
 
+.settings-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 0;
+}
+
+.linked-parent-status {
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    padding: 6px 0;
+}
+
 .form-group label {
     display: block;
     margin-bottom: 8px;

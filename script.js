@@ -114,6 +114,8 @@ auth.onAuthStateChanged(user => {
         });
 
         setupToggleBtn();
+        initParentSharing(user);
+        handleIncomingShare();
 
     } else {
         el('user-status').textContent = 'אנא התחברי לצפייה בנתונים';
@@ -787,11 +789,6 @@ auth.getRedirectResult()
     })
     .catch(err => console.error('Redirect error:', err));
 
-// ===== Global error handler =====
-window.addEventListener('error', e => {
-    console.error('JS Error:', e.error);
-});
-
 // ===== SMART TEXT PARSER =====
 // Parses free Hebrew text into activity fields.
 // Returns: { kidId, title, date, time, endTime, repeatWeekly, isTransport, isReturn, isPermanent }
@@ -1197,6 +1194,212 @@ function markActivityDone(kidId, actId, isDone) {
         modalContent.appendChild(actions);
     }
 })();
+
+// ===== PARENT SHARING =====
+let _currentUserUid   = null;
+let _currentUserName  = null;
+let _currentUserEmail = null;
+
+function sanitizeEmail(email) {
+    return email.toLowerCase().replace(/[.#$[\]]/g, '_');
+}
+
+function initParentSharing(user) {
+    _currentUserUid   = user.uid;
+    _currentUserName  = user.displayName;
+    _currentUserEmail = user.email;
+
+    const myEmailKey = sanitizeEmail(user.email);
+    db.ref('invites/' + myEmailKey).once('value', snap => {
+        if (snap.exists()) showInviteModal(snap.val(), myEmailKey);
+    });
+
+    db.ref('users/' + user.uid + '/settings/linkedTo').once('value', snap => {
+        if (snap.val()) switchToLinkedParent(snap.val());
+        updateLinkedStatus(snap.val());
+    });
+
+    const shareBtn = document.getElementById('shareParentBtn');
+    if (shareBtn) shareBtn.onclick = sendParentInvite;
+    const unlinkBtn = document.getElementById('unlinkParentBtn');
+    if (unlinkBtn) unlinkBtn.onclick = unlinkParent;
+}
+
+function sendParentInvite() {
+    const emailInput = document.getElementById('shareParentEmail');
+    const msg        = document.getElementById('shareParentMsg');
+    const email      = emailInput && emailInput.value.trim();
+    if (!email || !email.includes('@')) { if (msg) msg.textContent = 'אימייל לא תקין'; return; }
+    const key = sanitizeEmail(email);
+    db.ref('invites/' + key).set({ fromUid: _currentUserUid, fromName: _currentUserName, fromEmail: _currentUserEmail, sentAt: Date.now() })
+        .then(() => { if (msg) msg.textContent = 'הזמנה נשלחה ✓'; if (emailInput) emailInput.value = ''; })
+        .catch(() => { if (msg) msg.textContent = 'שגיאה בשליחה'; });
+}
+
+function showInviteModal(inv, myEmailKey) {
+    const modalContent = document.getElementById('modalContent');
+    document.getElementById('modalTitle').innerHTML = '👨‍👩‍👧 הזמנה לשיתוף לוח';
+    modalContent.innerHTML = '';
+    document.getElementById('modalBackdrop').style.display = 'flex';
+
+    const card = document.createElement('div');
+    card.className = 'voice-summary';
+    card.innerHTML = '<div class="voice-field"><span>👤 מי</span><strong>' + inv.fromName + '</strong></div>' +
+        '<div class="voice-field"><span>📧 אימייל</span><strong>' + inv.fromEmail + '</strong></div>' +
+        '<p style="font-size:0.88rem;color:var(--text-secondary);margin-top:10px;">אם תאשרי, תראי את הלוח של ' + inv.fromName + ' בזמן אמת.</p>';
+    modalContent.appendChild(card);
+
+    const acceptBtn = document.createElement('button');
+    acceptBtn.className = 'save-act-btn';
+    acceptBtn.style.marginTop = '12px';
+    acceptBtn.textContent = '✅ אני מאשרת';
+    acceptBtn.onclick = () => {
+        db.ref('users/' + _currentUserUid + '/settings/linkedTo').set(inv.fromUid)
+            .then(() => {
+                db.ref('invites/' + myEmailKey).remove();
+                document.getElementById('modalBackdrop').style.display = 'none';
+                showNotification('מחוברת ללוח של ' + inv.fromName + ' ✓', 'success');
+                switchToLinkedParent(inv.fromUid);
+            })
+            .catch(() => showNotification('שגיאה בחיבור', 'error'));
+    };
+
+    const declineBtn = document.createElement('button');
+    declineBtn.className = 'btn-outline';
+    declineBtn.style.marginTop = '8px';
+    declineBtn.textContent = '❌ דחי';
+    declineBtn.onclick = () => { db.ref('invites/' + myEmailKey).remove(); document.getElementById('modalBackdrop').style.display = 'none'; };
+
+    modalContent.appendChild(acceptBtn);
+    modalContent.appendChild(declineBtn);
+}
+
+function switchToLinkedParent(linkedUid) {
+    if (userKidsRef) userKidsRef.off();
+    userKidsRef = db.ref('users/' + linkedUid + '/kids');
+    userKidsRef.on('value', snap => renderKids(snap.val()));
+    updateLinkedStatus(linkedUid);
+}
+
+function updateLinkedStatus(linkedUid) {
+    const statusEl  = document.getElementById('linkedParentStatus');
+    const unlinkWrap = document.getElementById('unlinkParentWrap');
+    if (!statusEl) return;
+    if (linkedUid) {
+        statusEl.innerHTML = '<span style="color:var(--success)">✅ מחוברת ללוח משותף</span>';
+        if (unlinkWrap) unlinkWrap.style.display = 'block';
+    } else {
+        statusEl.textContent = 'לא מחוברת להורה נוסף';
+        if (unlinkWrap) unlinkWrap.style.display = 'none';
+    }
+}
+
+function unlinkParent() {
+    if (!confirm('לנתק את השיתוף עם ההורה השני?')) return;
+    db.ref('users/' + _currentUserUid + '/settings/linkedTo').remove()
+        .then(() => {
+            if (userKidsRef) userKidsRef.off();
+            userKidsRef = db.ref('users/' + _currentUserUid + '/kids');
+            userKidsRef.on('value', snap => renderKids(snap.val()));
+            updateLinkedStatus(null);
+            showNotification('השיתוף נותק', 'info');
+            document.getElementById('settingsModalBackdrop').style.display = 'none';
+        })
+        .catch(() => showNotification('שגיאה בניתוק', 'error'));
+}
+
+// ===== INCOMING SHARE HANDLER =====
+function handleIncomingShare() {
+    const params = new URLSearchParams(location.search);
+    const rawAct = params.get('sharedAct');
+    const rawKid = params.get('sharedKid');
+    if (!rawAct && !rawKid) return;
+    history.replaceState({}, '', location.pathname);
+    try {
+        if (rawAct) {
+            const act = JSON.parse(decodeURIComponent(escape(atob(rawAct))));
+            showShareImportModal({ type: 'activity', data: act });
+        } else {
+            const kid = JSON.parse(decodeURIComponent(escape(atob(rawKid))));
+            showShareImportModal({ type: 'kid', data: kid });
+        }
+    } catch(e) { showNotification('קישור השיתוף לא תקין', 'error'); }
+}
+
+function showShareImportModal({ type, data }) {
+    const modalContent = document.getElementById('modalContent');
+    document.getElementById('modalBackdrop').style.display = 'flex';
+
+    if (type === 'activity') {
+        const a = data;
+        document.getElementById('modalTitle').innerHTML = '📨 קיבלת פעילות';
+        modalContent.innerHTML = '';
+
+        const card = document.createElement('div');
+        card.className = 'voice-summary';
+        card.innerHTML =
+            '<div class="voice-field"><span>📝 פעילות</span><strong>' + (a.title||'—') + '</strong></div>' +
+            '<div class="voice-field"><span>📅 תאריך</span><strong>' + (a.date||'—') + '</strong></div>' +
+            '<div class="voice-field"><span>⏰ שעה</span><strong>' + (a.time||'—') + '</strong></div>' +
+            (a.repeatWeekly ? '<div class="voice-field"><span>🔁</span><strong>חוזר שבועי</strong></div>' : '') +
+            (a.isTransport  ? '<div class="voice-field"><span>🚗</span><strong>הסעה</strong></div>' : '');
+        modalContent.appendChild(card);
+
+        const kidSel = document.createElement('div');
+        kidSel.className = 'voice-kid-select';
+        kidSel.innerHTML = '<label style="font-size:0.88rem;font-weight:600;color:var(--text-secondary)">הוסף לילד/ה:</label>';
+        const sel = document.createElement('select');
+        sel.className = 'date-input';
+        sel.innerHTML = '<option value="">— בחרי —</option>';
+        if (userKidsRef) {
+            userKidsRef.once('value', snap => {
+                Object.entries(snap.val() || {}).forEach(([id, k]) => { sel.innerHTML += '<option value="' + id + '">' + k.name + '</option>'; });
+            });
+        }
+        kidSel.appendChild(sel);
+        modalContent.appendChild(kidSel);
+
+        const saveBtn = document.createElement('button');
+        saveBtn.className = 'save-act-btn';
+        saveBtn.style.marginTop = '12px';
+        saveBtn.textContent = '✅ הוסף ללוח שלי';
+        saveBtn.onclick = () => {
+            const kidId = sel.value;
+            if (!kidId) { showNotification('בחרי ילד/ה קודם', 'error'); return; }
+            const newAct = Object.assign({}, a, { id: 'a_' + Date.now() });
+            userKidsRef.child(kidId).child('activities').once('value', snap => {
+                const list = snap.val() || [];
+                const arr  = Array.isArray(list) ? list : Object.values(list);
+                userKidsRef.child(kidId).child('activities').set([...arr, newAct])
+                    .then(() => { document.getElementById('modalBackdrop').style.display = 'none'; showNotification('הפעילות נוספה ✓', 'success'); })
+                    .catch(() => showNotification('שגיאה בשמירה', 'error'));
+            });
+        };
+        modalContent.appendChild(saveBtn);
+
+    } else {
+        const kid = data;
+        document.getElementById('modalTitle').innerHTML = '📨 קיבלת לוח ילד/ה';
+        modalContent.innerHTML = '';
+        const acts = Array.isArray(kid.activities) ? kid.activities : Object.values(kid.activities || {});
+        const card = document.createElement('div');
+        card.className = 'voice-summary';
+        card.innerHTML = '<div class="voice-field"><span>👤 שם</span><strong>' + (kid.name||'—') + '</strong></div>' +
+            '<div class="voice-field"><span>📋 פעילויות</span><strong>' + acts.length + '</strong></div>';
+        modalContent.appendChild(card);
+        const saveBtn = document.createElement('button');
+        saveBtn.className = 'save-act-btn';
+        saveBtn.style.marginTop = '12px';
+        saveBtn.textContent = '✅ הוסף ללוח שלי';
+        saveBtn.onclick = () => {
+            const ref = userKidsRef.push();
+            ref.set(Object.assign({}, kid, { id: ref.key }))
+                .then(() => { document.getElementById('modalBackdrop').style.display = 'none'; showNotification(kid.name + ' נוסף/ה ✓', 'success'); })
+                .catch(() => showNotification('שגיאה בשמירה', 'error'));
+        };
+        modalContent.appendChild(saveBtn);
+    }
+}
 
 // ===== Global error handler =====
 window.addEventListener('error', e => {
