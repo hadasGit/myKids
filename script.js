@@ -861,25 +861,57 @@ function parseActivityText(text, kidsList = []) {
         remaining = remaining.replace(/הסעה|מסיעה|🚗/g, '').trim();
     }
 
-    // --- 3. Day → date ---
-    for (const [word, dayIndex] of Object.entries(HEBREW_DAYS)) {
-        if (remaining.includes(word)) {
-            result.date = nextWeekdayDate(dayIndex);
-            remaining = remaining.replace(word, '').trim();
-            break;
+    // --- 3. Day / date ---
+    // Explicit date: "29.6" / "29/6" / "29.6.2026"
+    const explicitDateMatch = remaining.match(/(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?/);
+    if (explicitDateMatch) {
+        const day   = explicitDateMatch[1].padStart(2, '0');
+        const month = explicitDateMatch[2].padStart(2, '0');
+        const year  = explicitDateMatch[3]
+            ? (explicitDateMatch[3].length === 2 ? '20' + explicitDateMatch[3] : explicitDateMatch[3])
+            : new Date().getFullYear();
+        result.date = `${year}-${month}-${day}`;
+        remaining = remaining.replace(explicitDateMatch[0], '').trim();
+    } else {
+        // Hebrew day names
+        for (const [word, dayIndex] of Object.entries(HEBREW_DAYS)) {
+            if (remaining.includes(word)) {
+                result.date = nextWeekdayDate(dayIndex);
+                remaining = remaining.replace(word, '').trim();
+                break;
+            }
         }
-    }
-    // "היום" / "מחר" / "מחרתיים"
-    if (/\bהיום\b/.test(remaining)) {
-        result.date = todayStr();
-        remaining = remaining.replace(/\bהיום\b/, '').trim();
-    } else if (/\bמחר\b/.test(remaining)) {
-        const d = new Date(); d.setDate(d.getDate() + 1);
-        result.date = d.toISOString().slice(0, 10);
-        remaining = remaining.replace(/\bמחר\b/, '').trim();
+        // "היום" / "מחר"
+        if (/היום/.test(remaining)) {
+            result.date = todayStr();
+            remaining = remaining.replace(/היום/g, '').trim();
+        } else if (/מחר/.test(remaining)) {
+            const d = new Date(); d.setDate(d.getDate() + 1);
+            result.date = d.toISOString().slice(0, 10);
+            remaining = remaining.replace(/מחר/g, '').trim();
+        }
     }
 
     // --- 4. Time ---
+    // Detect period modifier FIRST ("בערב", "בצהריים", "בבוקר", "בלילה")
+    let pmOffset = 0;
+    if (/בערב|בלילה/.test(remaining)) {
+        pmOffset = 12; // add 12 to hours 1-11
+        remaining = remaining.replace(/בערב|בלילה/g, '').trim();
+    } else if (/בצהריים|בצהרים/.test(remaining)) {
+        pmOffset = 12;
+        remaining = remaining.replace(/בצהריים|בצהרים/g, '').trim();
+    } else if (/בבוקר/.test(remaining)) {
+        pmOffset = 0;
+        remaining = remaining.replace(/בבוקר/g, '').trim();
+    }
+
+    function applyPmOffset(h) {
+        // Only add offset to 1-11 (noon/midnight cases handled separately)
+        if (pmOffset > 0 && h >= 1 && h <= 11) return h + pmOffset;
+        return h;
+    }
+
     // "16:30 עד 17:00" or "16:00"
     const timeRangeMatch = remaining.match(/(\d{1,2}:\d{2})\s*(?:עד|-)\s*(\d{1,2}:\d{2})/);
     if (timeRangeMatch) {
@@ -895,27 +927,37 @@ function parseActivityText(text, kidsList = []) {
             // "16 וחצי" / "ארבע וחצי" / "ארבע ורבע"
             const halfMatch = remaining.match(/(\d{1,2})\s*(וחצי|וחצ'|וחצ)/);
             if (halfMatch) {
-                result.time = padTime(`${halfMatch[1]}:30`);
+                const h = applyPmOffset(parseInt(halfMatch[1]));
+                result.time = padTime(`${h}:30`);
                 remaining = remaining.replace(halfMatch[0], '').trim();
             } else {
-                const quarterMatch = remaining.match(/(\d{1,2})\s*(ורבע)/);
+                const quarterMatch = remaining.match(/(\d{1,2})\s*ורבע/);
                 if (quarterMatch) {
-                    result.time = padTime(`${quarterMatch[1]}:15`);
+                    const h = applyPmOffset(parseInt(quarterMatch[1]));
+                    result.time = padTime(`${h}:15`);
                     remaining = remaining.replace(quarterMatch[0], '').trim();
                 } else {
-                    // Word-based hours
-                    for (const [word, h] of Object.entries(HEBREW_HOUR_WORDS)) {
-                        const r = new RegExp(`\\b${word}\\b`);
-                        if (r.test(remaining)) {
-                            const halfW = new RegExp(`\\b${word}\\s+וחצי\\b`);
-                            if (halfW.test(remaining)) {
-                                result.time = `${String(h).padStart(2,'0')}:30`;
-                                remaining = remaining.replace(halfW, '').trim();
-                            } else {
-                                result.time = `${String(h).padStart(2,'0')}:00`;
-                                remaining = remaining.replace(r, '').trim();
+                    // Standalone digit hour: "בשבע" / "שבע" / "ב5"
+                    const digitHourMatch = remaining.match(/ב?(\d{1,2})(?!\d|[./])/);
+                    if (digitHourMatch) {
+                        const h = applyPmOffset(parseInt(digitHourMatch[1]));
+                        result.time = padTime(`${h}:00`);
+                        remaining = remaining.replace(digitHourMatch[0], '').trim();
+                    } else {
+                        // Word-based hours ("שבע", "חמש", ...)
+                        for (const [word, rawH] of Object.entries(HEBREW_HOUR_WORDS)) {
+                            if (remaining.includes(word)) {
+                                const h = applyPmOffset(rawH);
+                                const halfW = word + ' וחצי';
+                                if (remaining.includes(halfW)) {
+                                    result.time = `${String(h).padStart(2,'0')}:30`;
+                                    remaining = remaining.replace(halfW, '').trim();
+                                } else {
+                                    result.time = `${String(h).padStart(2,'0')}:00`;
+                                    remaining = remaining.replace(word, '').trim();
+                                }
+                                break;
                             }
-                            break;
                         }
                     }
                 }
@@ -1111,7 +1153,6 @@ function markActivityDone(kidId, actId, isDone) {
         saveBtn.onclick = () => {
             if (!parsed.kidId) { showNotification('בחרי ילד/ה קודם', 'error'); return; }
             if (!parsed.title) { showNotification('לא זוהתה פעילות', 'error'); return; }
-            // Build activity and save directly
             const newAct = {
                 id:           'a_' + Date.now(),
                 title:        parsed.title,
@@ -1140,7 +1181,6 @@ function markActivityDone(kidId, actId, isDone) {
         editBtn.style.cssText = 'margin-top:8px;';
         editBtn.textContent = '✏️ ערוך ידנית';
         editBtn.onclick = () => {
-            // Open regular modal pre-filled
             if (!parsed.kidId) { showNotification('בחרי ילד/ה קודם', 'error'); return; }
             userKidsRef.child(parsed.kidId).once('value', snap => {
                 const kid = snap.val();
@@ -1157,3 +1197,8 @@ function markActivityDone(kidId, actId, isDone) {
         modalContent.appendChild(actions);
     }
 })();
+
+// ===== Global error handler =====
+window.addEventListener('error', e => {
+    console.error('JS Error:', e.error);
+});
