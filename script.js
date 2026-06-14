@@ -14,8 +14,9 @@ const firebaseConfig = {
 
 // ===== Initialize Firebase =====
 const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(firebaseConfig);
-const db   = firebase.database();
-const auth = firebase.auth();
+const db      = firebase.database();
+const auth    = firebase.auth();
+const storage = firebase.storage();
 
 const googleProvider = new firebase.auth.GoogleAuthProvider();
 googleProvider.addScope('email');
@@ -176,7 +177,7 @@ function renderKids(kids) {
     // Assign stable colors by order
     const kidIds = Object.keys(kids);
     kidIds.forEach((kidId, idx) => {
-        kidsColorMap[kidId] = getKidColor(idx);
+        kidsColorMap[kidId] = kids[kidId].color || getKidColor(idx);
         kidsIndexMap[kidId] = idx;
     });
 
@@ -191,18 +192,41 @@ function renderKids(kids) {
         box.style.setProperty('--kid-color', color);
         box.style.borderTop = `5px solid ${color}`;
 
-        // Avatar
+        // Avatar — supports photo or initials
         const avatar = document.createElement('div');
         avatar.className = 'kid-avatar';
-        avatar.style.background = color;
-        avatar.textContent = getInitials(kid.name);
+        avatar.title = 'לחצי להחלפת תמונה';
+        if (kid.photoURL) {
+            avatar.style.backgroundImage = 'url(' + kid.photoURL + ')';
+            avatar.style.backgroundSize = 'cover';
+            avatar.style.backgroundPosition = 'center';
+            avatar.style.background = color;
+        } else {
+            avatar.style.background = color;
+            avatar.textContent = getInitials(kid.name);
+        }
+        // Hidden file input for photo upload
+        const photoInput = document.createElement('input');
+        photoInput.type = 'file';
+        photoInput.accept = 'image/*';
+        photoInput.style.display = 'none';
+        photoInput.onchange = e => uploadKidPhoto(kidId, e.target.files[0]);
+        avatar.appendChild(photoInput);
+        avatar.onclick = e => { e.stopPropagation(); photoInput.click(); };
         box.appendChild(avatar);
 
-        // Name
+        // Name + color picker trigger
         const nameEl = document.createElement('div');
         nameEl.className = 'kid-name';
         nameEl.textContent = kid.name;
         box.appendChild(nameEl);
+
+        const colorDot = document.createElement('button');
+        colorDot.className = 'color-dot-btn';
+        colorDot.style.background = color;
+        colorDot.title = 'שנה צבע';
+        colorDot.onclick = e => { e.stopPropagation(); openColorPicker(kidId, color, colorDot); };
+        box.appendChild(colorDot);
 
         // Today's activities count
         const todayActs = activities.filter(a => {
@@ -550,19 +574,13 @@ function saveActivity(kidId, kid, activityToEdit, activities) {
 
 // ===== Delete Activity =====
 window.deleteActivity = (kidId, actId) => {
-    if (!confirm('למחוק את הפעילות?')) return;
-    userKidsRef.child(kidId).child('activities').once('value', snap => {
-        const list     = snap.val() || [];
-        const filtered = list.filter(a => String(a.id) !== String(actId));
-        userKidsRef.child(kidId).child('activities').set(filtered)
-            .then(() => {
-                showNotification('הפעילות נמחקה', 'error');
-                userKidsRef.child(kidId).once('value', s => {
-                    if (s.exists()) openKidModal(kidId, s.val());
-                    else el('modalBackdrop').style.display = 'none';
-                });
-            })
-            .catch(err => console.error('מחיקה נכשלה:', err));
+    userKidsRef.child(kidId).once('value', snap => {
+        const kid = snap.val() || {};
+        const list = kid.activities || [];
+        const arr  = Array.isArray(list) ? list : Object.values(list);
+        const act  = arr.find(a => String(a.id) === String(actId));
+        el('modalBackdrop').style.display = 'none';
+        deleteActivityWithUndo(kidId, actId, kid.name || '', act?.title || 'פעילות');
     });
 };
 
@@ -892,15 +910,15 @@ function parseActivityText(text, kidsList = []) {
     // --- 4. Time ---
     // Detect period modifier FIRST ("בערב", "בצהריים", "בבוקר", "בלילה")
     let pmOffset = 0;
-    if (/בערב|בלילה/.test(remaining)) {
-        pmOffset = 12; // add 12 to hours 1-11
-        remaining = remaining.replace(/בערב|בלילה/g, '').trim();
-    } else if (/בצהריים|בצהרים/.test(remaining)) {
+    if (/בערב|בלילה|אחר.?הצהריים|אחה["״]צ/.test(remaining)) {
         pmOffset = 12;
-        remaining = remaining.replace(/בצהריים|בצהרים/g, '').trim();
-    } else if (/בבוקר/.test(remaining)) {
+        remaining = remaining.replace(/אחר.?הצהריים|אחה["״]צ|בערב|בלילה/g, '').trim();
+    } else if (/בצהריים|בצהרים|בצהרי/.test(remaining)) {
+        pmOffset = 12;
+        remaining = remaining.replace(/בצהריים|בצהרים|בצהרי/g, '').trim();
+    } else if (/בבוקר|בבוקרו/.test(remaining)) {
         pmOffset = 0;
-        remaining = remaining.replace(/בבוקר/g, '').trim();
+        remaining = remaining.replace(/בבוקר|בבוקרו/g, '').trim();
     }
 
     function applyPmOffset(h) {
@@ -991,6 +1009,105 @@ function padTime(t) {
 
 // Expose for use by voice module and modal
 window.parseActivityText = parseActivityText;
+
+// ===== PHOTO UPLOAD =====
+function uploadKidPhoto(kidId, file) {
+    if (!file || !userKidsRef) return;
+    if (file.size > 5 * 1024 * 1024) { showNotification('תמונה גדולה מדי (מקסימום 5MB)', 'error'); return; }
+    showNotification('מעלה תמונה...', 'info');
+    const ref = storage.ref('kids/' + _currentUserUid + '/' + kidId + '.' + file.name.split('.').pop());
+    ref.put(file).then(snap => snap.ref.getDownloadURL()).then(url => {
+        userKidsRef.child(kidId).update({ photoURL: url })
+            .then(() => showNotification('התמונה עודכנה ✓', 'success'))
+            .catch(() => showNotification('שגיאה בשמירה', 'error'));
+    }).catch(() => showNotification('שגיאה בהעלאה', 'error'));
+}
+
+// ===== COLOR PICKER =====
+const COLOR_OPTIONS = ['#6366f1','#f43f5e','#10b981','#f59e0b','#8b5cf6','#06b6d4','#ec4899','#14b8a6','#ef4444','#3b82f6'];
+
+function openColorPicker(kidId, currentColor, anchorEl) {
+    document.querySelectorAll('.color-picker-popup').forEach(p => p.remove());
+    const popup = document.createElement('div');
+    popup.className = 'color-picker-popup';
+    COLOR_OPTIONS.forEach(c => {
+        const swatch = document.createElement('button');
+        swatch.className = 'color-swatch' + (c === currentColor ? ' selected' : '');
+        swatch.style.background = c;
+        swatch.title = c;
+        swatch.onclick = e => {
+            e.stopPropagation();
+            userKidsRef.child(kidId).update({ color: c })
+                .then(() => showNotification('צבע עודכן ✓', 'success'))
+                .catch(() => showNotification('שגיאה', 'error'));
+            popup.remove();
+        };
+        popup.appendChild(swatch);
+    });
+    document.body.appendChild(popup);
+    const rect = anchorEl.getBoundingClientRect();
+    popup.style.top  = (rect.bottom + window.scrollY + 6) + 'px';
+    popup.style.right = (window.innerWidth - rect.right) + 'px';
+    setTimeout(() => document.addEventListener('click', () => popup.remove(), { once: true }), 50);
+}
+
+// ===== UNDO DELETE =====
+let _undoTimer   = null;
+let _undoPending = null;  // { kidId, actId, list, kidName, actTitle }
+
+function deleteActivityWithUndo(kidId, actId, kidName, actTitle) {
+    // Cancel any previous pending undo
+    if (_undoTimer) { clearTimeout(_undoTimer); _undoTimer = null; }
+    if (_undoPending) { _flushDelete(_undoPending); }
+
+    userKidsRef.child(kidId).child('activities').once('value', snap => {
+        const list    = snap.val() || [];
+        const arr     = Array.isArray(list) ? list : Object.values(list);
+        const filtered = arr.filter(a => String(a.id) !== String(actId));
+        _undoPending = { kidId, actId, arr, filtered, kidName, actTitle };
+
+        // Optimistically update UI
+        userKidsRef.child(kidId).child('activities').set(filtered);
+
+        // Show undo toast
+        showUndoToast(actTitle, () => {
+            // User clicked undo — restore
+            clearTimeout(_undoTimer);
+            _undoTimer = null;
+            if (_undoPending) {
+                userKidsRef.child(kidId).child('activities').set(_undoPending.arr)
+                    .then(() => showNotification('הפעילות שוחזרה ✓', 'success'));
+                _undoPending = null;
+            }
+        });
+
+        _undoTimer = setTimeout(() => {
+            _undoPending = null;
+            _undoTimer = null;
+        }, 5000);
+    });
+}
+
+function _flushDelete(pending) {
+    // Already written optimistically — nothing to do
+    _undoPending = null;
+}
+
+function showUndoToast(title, onUndo) {
+    document.querySelectorAll('.undo-toast').forEach(t => t.remove());
+    const toast = document.createElement('div');
+    toast.className = 'undo-toast';
+    const msg = document.createElement('span');
+    msg.textContent = '"' + title + '" נמחקה';
+    const btn = document.createElement('button');
+    btn.className = 'undo-btn';
+    btn.textContent = 'בטל';
+    btn.onclick = () => { onUndo(); toast.remove(); };
+    toast.appendChild(msg);
+    toast.appendChild(btn);
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.classList.add('undo-hide'); setTimeout(() => toast.remove(), 400); }, 5000);
+}
 
 // ===== SWIPE TO COMPLETE =====
 function addSwipeListeners(element, onSwipeRight, onSwipeLeft) {
